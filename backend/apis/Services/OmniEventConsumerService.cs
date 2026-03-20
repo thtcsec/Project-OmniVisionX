@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using Omni.API.Hubs;
+using StackExchange.Redis;
 
 namespace Omni.API.Services;
 
