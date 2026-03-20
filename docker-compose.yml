@@ -11,7 +11,7 @@ services:
     container_name: omni-db
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: omnivision
@@ -33,7 +33,7 @@ services:
     container_name: omni-bus
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - D:/docker-data/omnivision/redis:/data
     networks:
@@ -69,7 +69,7 @@ services:
     container_name: omni-api
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${API_PORT:-8080}:8080"
     environment:
       - ConnectionStrings__DefaultConnection=Host=omni-db;Database=omnivision;Username=postgres;Password=admin
     depends_on:
@@ -91,7 +91,7 @@ services:
     container_name: omni-simulator
     restart: unless-stopped
     ports:
-      - "8554:8554"  # HTTP API
+      - "${SIMULATOR_PORT:-8554}:8554"  # HTTP API
     volumes:
       - ./data/videos:/videos  # Drop video files here
     networks:
@@ -109,7 +109,7 @@ services:
     profiles:
       - gpu
     ports:
-      - "8555:8555"
+      - "${OBJECT_PORT:-8555}:8555"
     environment:
       - REDIS_URL=redis://omni-bus:6379
       - DEVICE=cuda:0
@@ -143,7 +143,7 @@ services:
     profiles:
       - gpu
     ports:
-      - "8001:8001"
+      - "${VEHICLE_PORT:-8001}:8001"
     environment:
       - REDIS_URL=redis://omni-bus:6379
       - DEVICE=cuda:0
@@ -175,7 +175,7 @@ services:
     profiles:
       - gpu
     ports:
-      - "8002:8002"
+      - "${HUMAN_PORT:-8002}:8002"
     environment:
       - REDIS_URL=redis://omni-bus:6379
       - DEVICE=cuda:0
@@ -205,7 +205,7 @@ services:
     container_name: omni-ui
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "${UI_PORT:-3000}:80"
     depends_on:
       - omni-api
     networks:
