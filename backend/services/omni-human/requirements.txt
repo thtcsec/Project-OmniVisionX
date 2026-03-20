@@ -1,0 +1,31 @@
+# omni-human dependencies
+# Face Recognition System Service Dependencies
+ultralytics>=8.1.0
+
+# FastAPI
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Image Processing
+Pillow>=10.3.0
+opencv-python-headless==4.9.0.80
+# CRITICAL: numpy 2.x breaks OpenCV/InsightFace (_ARRAY_API error)
+numpy>=1.24.0,<2.0
+
+# ML/AI - InsightFace
+onnxruntime-gpu==1.16.3
+insightface==0.7.3
+
+# Database (for pgvector similarity search)
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.25
+pgvector==0.2.4
+
+# Utilities
+pydantic==2.7.4
+pydantic-settings==2.2.1
+python-dotenv==1.0.0
+
+# Redis Streams (Event-Driven Phase 1)
+redis[hiredis]>=5.0.0

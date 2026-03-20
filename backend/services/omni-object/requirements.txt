@@ -1,0 +1,31 @@
+# omni-object dependencies
+# RTSP Flow Master - YOLOv11m + ByteTrack + Redis Streams
+
+# FastAPI
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+
+# Image Processing
+Pillow>=10.3.0
+opencv-python-headless==4.9.0.80
+numpy>=1.24.0,<2.0
+
+# ML/AI - YOLO + ByteTrack
+ultralytics>=8.3.0
+
+# ML Backend
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Redis Streams
+redis[hiredis]>=5.0.0
+
+# Database (camera list query)
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.25
+
+# Utilities
+pydantic==2.7.4
+pydantic-settings==2.2.1
+python-dotenv==1.0.0
+httpx==0.26.0

@@ -1,0 +1,49 @@
+# omni-vehicle dependencies
+# License Plate Recognition Service Dependencies
+
+# FastAPI
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Image Processing
+Pillow>=10.3.0
+opencv-python-headless==4.9.0.80
+numpy>=1.24.0
+
+# ML/AI
+torch>=2.0.0
+torchvision>=0.15.0
+
+# OCR
+paddlepaddle==2.6.2
+paddleocr==2.7.0.3
+
+# Utilities
+pydantic==2.7.4
+pydantic-settings==2.2.1
+python-dotenv==1.0.0
+httpx==0.26.0
+aiofiles==23.2.1
+
+# Database
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.25
+
+# Redis Streams (event-driven mode)
+redis[hiredis]>=5.0.0
+
+# YOLOv5 dependencies
+gitpython>=3.1.30
+
+# YOLOv11 (Fortress)
+ultralytics==8.3.0
+pandas==2.1.4
+
+
+# Super-Resolution (RealESRGAN)
+realesrgan>=0.3.0
+basicsr>=1.4.2
+
+# GPU Monitoring (optional — used by settings API for GPU temperature/power)
+nvidia-ml-py3>=7.352.0
