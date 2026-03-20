@@ -1,0 +1,49 @@
+# OmniVision MediaMTX Configuration
+# RTSP -> HLS/WebRTC conversion
+
+api: yes
+apiAddress: :8997
+
+metrics: yes
+metricsAddress: :9998
+
+authInternalUsers:
+  - user: any
+    pass: ""
+    ips: []
+    permissions:
+      - action: api
+      - action: metrics
+      - action: pprof
+      - action: read
+      - action: publish
+      - action: playback
+
+# Protocols
+rtsp: yes
+rtspAddress: :8554
+
+rtmp: no
+
+hls: yes
+hlsAddress: :8888
+hlsAllowOrigins: ['*']
+hlsAlwaysRemux: yes
+hlsVariant: mpegts
+hlsSegmentCount: 5
+hlsSegmentDuration: 1s
+hlsSegmentMaxSize: 50M
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcAllowOrigins: ['*']
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
+
+pathDefaults:
+  sourceOnDemandStartTimeout: 15s
+  sourceOnDemandCloseAfter: 5m
+
+paths:
+  all_others:
+    source: publisher
