@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Omni.API.Data;
 using Omni.API.Hubs;
 using Omni.API.Models;
@@ -76,10 +77,10 @@ public class CamerasController : ControllerBase
     }
 
     [HttpPost("{id}/subscribe")]
-    public async Task<IActionResult> SubscribeToCamera(string id)
+    public IActionResult SubscribeToCamera(string id)
     {
-        // SignalR group management is handled in Hub
-        await _hub.Groups.AddToGroupAsync(Context.ConnectionId, $"camera-{id}");
-        return Ok(new { message = $"Subscribed to camera {id}" });
+        // SignalR group management must be handled directly via Hub connection from the client side.
+        // A client connects to the hub and calls the Hub's Subscribe method with the camera ID instead.
+        return Ok(new { message = $"Use SignalR Hub to subscribe to camera {id}." });
     }
 }

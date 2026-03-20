@@ -45,7 +45,7 @@ public class OmniEventConsumerService : BackgroundService
                         foreach (var entry in entries)
                         {
                             await ProcessEntry(streamKey, entry);
-                            await db.StreamAckAsync(streamKey, "omni-api-consumers", entry.Id);
+                            await db.StreamAcknowledgeAsync(streamKey, "omni-api-consumers", entry.Id);
                         }
                     }
                     catch (RedisServerException ex) when (ex.Message.Contains("NOGROUP"))

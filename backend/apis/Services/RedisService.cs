@@ -16,10 +16,10 @@ public class RedisService
 
     public IDatabase GetDatabase() => _db;
 
-    public async Task<RedisValue[]> StreamReadAsync(string key, string group, int count = 100)
+    public async Task<StreamEntry[]> StreamReadAsync(string key, string group, int count = 100)
     {
         var entries = await _db.StreamReadGroupAsync(key, group, "consumer", count);
-        return entries.Select(e => e.Values).ToArray();
+        return entries;
     }
 
     public async Task StreamAckAsync(string key, string group, RedisValue messageId)
