@@ -1,0 +1,219 @@
+# Project OmniVision — Docker Compose
+# Chạy: docker compose -f docker-compose.yml up -d
+# GPU: docker compose -f docker-compose.yml --profile gpu up -d
+
+services:
+  # ============================================
+  # DATABASE - PostgreSQL with pgvector
+  # ============================================
+  omni-db:
+    image: ankane/pgvector:latest
+    container_name: omni-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: omnivision
+    volumes:
+      - D:/docker-data/omnivision/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - omni-network
+
+  # ============================================
+  # REDIS - Event Bus
+  # ============================================
+  omni-bus:
+    image: redis:7-alpine
+    container_name: omni-bus
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - D:/docker-data/omnivision/redis:/data
+    networks:
+      - omni-network
+
+  # ============================================
+  # MINIO - S3-compatible object storage
+  # API:9000  Console:9001  (override via .env)
+  # ============================================
+  omni-minio:
+    image: minio/minio:latest
+    container_name: omni-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-omniminioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change_this_minio_secret}
+    volumes:
+      - omni_minio_data:/data
+    networks:
+      - omni-network
+
+  # ============================================
+  # API - .NET 9 MVC + SignalR
+  # ============================================
+  omni-api:
+    build:
+      context: ./backend/apis
+      dockerfile: Dockerfile
+    container_name: omni-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=omni-db;Database=omnivision;Username=postgres;Password=admin
+    depends_on:
+      omni-db:
+        condition: service_healthy
+      omni-bus:
+        condition: service_started
+    networks:
+      - omni-network
+
+  # ============================================
+  # SIMULATOR - Mock Camera RTSP Server
+  # Drop video files into /videos, access via rtsp://
+  # ============================================
+  omni-simulator:
+    build:
+      context: ./backend/services
+      dockerfile: omni-simulator/Dockerfile
+    container_name: omni-simulator
+    restart: unless-stopped
+    ports:
+      - "8554:8554"  # HTTP API
+    volumes:
+      - ./data/videos:/videos  # Drop video files here
+    networks:
+      - omni-network
+
+  # ============================================
+  # OBJECT DETECTOR - YOLOv11m + ByteTrack
+  # ============================================
+  omni-object:
+    build:
+      context: ./backend
+      dockerfile: services/omni-object/Dockerfile
+    container_name: omni-object
+    restart: unless-stopped
+    profiles:
+      - gpu
+    ports:
+      - "8555:8555"
+    environment:
+      - REDIS_URL=redis://omni-bus:6379
+      - DEVICE=cuda:0
+    volumes:
+      - ./data/weights:/app/weights
+      - ./data/shm:/app/shm
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      omni-bus:
+        condition: service_started
+      omni-simulator:
+        condition: service_started
+    networks:
+      - omni-network
+
+  # ============================================
+  # VEHICLE / LPR - License plate + vehicle pipeline
+  # ============================================
+  omni-vehicle:
+    build:
+      context: ./backend
+      dockerfile: services/omni-vehicle/Dockerfile
+    container_name: omni-vehicle
+    restart: unless-stopped
+    profiles:
+      - gpu
+    ports:
+      - "8001:8001"
+    environment:
+      - REDIS_URL=redis://omni-bus:6379
+      - DEVICE=cuda:0
+    volumes:
+      - ./data/weights:/app/weights
+      - ./data/thumbnails:/app/thumbnails
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      omni-bus:
+        condition: service_started
+    networks:
+      - omni-network
+
+  # ============================================
+  # HUMAN / FRS - Face + person stream consumer
+  # ============================================
+  omni-human:
+    build:
+      context: ./backend
+      dockerfile: services/omni-human/Dockerfile
+    container_name: omni-human
+    restart: unless-stopped
+    profiles:
+      - gpu
+    ports:
+      - "8002:8002"
+    environment:
+      - REDIS_URL=redis://omni-bus:6379
+      - DEVICE=cuda:0
+    volumes:
+      - ./data/weights:/app/weights
+      - ./data/thumbnails:/app/thumbnails
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      omni-bus:
+        condition: service_started
+    networks:
+      - omni-network
+
+  # ============================================
+  # UI - React Frontend
+  # ============================================
+  omni-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: omni-ui
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - omni-api
+    networks:
+      - omni-network
+
+networks:
+  omni-network:
+    driver: bridge
+
+volumes:
+  omni_minio_data:

@@ -1,0 +1,53 @@
+# Byte-compiled / optimized / DLLs
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+node_modules/
+*.egg-info/
+
+# Environments
+.env
+.venv
+env/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Data volumes (bind mounts)
+data/
+
+# YOLO weights (keep models/yolo/README + .gitkeep only)
+models/yolo/*.pt
+models/yolo/*.pth
+models/yolo/*.onnx
+models/yolo/*.engine
+
+# Docker
+.docker-cache/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Weights (large files)
+*.pt
+*.pth
+*.onnx
+*.h5
+
+# Temporary
+*.tmp
+*.bak
+
+.data/
