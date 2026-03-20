@@ -18,7 +18,8 @@ RUN mkdir -p /videos
 
 COPY omni-simulator/ /app/
 
-EXPOSE 8554 8555  # HTTP API port + RTSP port (handled by ffmpeg)
+# HTTP API port + RTSP port (handled by ffmpeg)
+EXPOSE 8554 8555
 
 # Run both uvicorn (API) and RTSP server via ffmpeg
 # RTSP URLs: rtsp://localhost:8554/<camera-id>
