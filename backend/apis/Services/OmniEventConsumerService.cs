@@ -45,7 +45,7 @@ public class OmniEventConsumerService : BackgroundService
                         foreach (var entry in entries)
                         {
                             await ProcessEntry(streamKey, entry);
-                            await redis.StreamAckAsync(streamKey, "omni-api-consumers", entry.ElementAt(0).Value);
+                            await db.StreamAckAsync(streamKey, "omni-api-consumers", entry.Id);
                         }
                     }
                     catch (RedisServerException ex) when (ex.Message.Contains("NOGROUP"))
@@ -73,11 +73,11 @@ public class OmniEventConsumerService : BackgroundService
         }
     }
 
-    private async Task ProcessEntry(string streamKey, RedisValue[] entry)
+    private async Task ProcessEntry(string streamKey, StreamEntry entry)
     {
-        var eventType = entry.FirstOrDefault(e => e.Name == "event_type").Value.ToString();
-        var cameraId = entry.FirstOrDefault(e => e.Name == "camera_id").Value.ToString();
-        var payload = entry.FirstOrDefault(e => e.Name == "payload").Value.ToString();
+        var eventType = entry.Values.FirstOrDefault(e => e.Name == "event_type").Value.ToString();
+        var cameraId = entry.Values.FirstOrDefault(e => e.Name == "camera_id").Value.ToString();
+        var payload = entry.Values.FirstOrDefault(e => e.Name == "payload").Value.ToString();
 
         // Broadcast to camera group
         if (!string.IsNullOrEmpty(cameraId))
