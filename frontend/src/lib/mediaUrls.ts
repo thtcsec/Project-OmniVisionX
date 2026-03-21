@@ -35,3 +35,38 @@ export function buildDefaultHlsUrl(cameraId: string): string {
 export function buildDefaultWebRtcUrl(cameraId: string): string {
   return `${getMediaWebRtcBase()}/${encodeURIComponent(cameraId)}/whep`;
 }
+
+export function getCameraMediaKey(camera: { id: string; streamUrl?: string }): string {
+  const raw = camera.streamUrl?.trim();
+  if (!raw) return camera.id;
+
+  try {
+    const u = new URL(raw);
+    const isRtsp = u.protocol === "rtsp:" || u.protocol === "rtsps:";
+    if (!isRtsp) return camera.id;
+
+    const host = u.hostname.toLowerCase();
+    const isMediaMtxHost = host === "omni-mediamtx" || host === "localhost" || host === "127.0.0.1";
+    if (!isMediaMtxHost) return camera.id;
+
+    const port = u.port || (u.protocol === "rtsps:" ? "322" : "554");
+    const isMediaMtxPort = port === "8554" || port === "18554";
+    if (!isMediaMtxPort) return camera.id;
+
+    const path = u.pathname.replace(/^\/+/, "").trim();
+    if (!path) return camera.id;
+    return path;
+  } catch {
+    return camera.id;
+  }
+}
+
+export function buildCameraHlsUrl(camera: { id: string; streamUrl?: string }): string {
+  const key = getCameraMediaKey(camera);
+  return `${getMediaHlsBase()}/${encodeURIComponent(key)}/index.m3u8`;
+}
+
+export function buildCameraWebRtcUrl(camera: { id: string; streamUrl?: string }): string {
+  const key = getCameraMediaKey(camera);
+  return `${getMediaWebRtcBase()}/${encodeURIComponent(key)}/whep`;
+}

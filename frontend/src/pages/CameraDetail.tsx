@@ -27,7 +27,7 @@ import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import type { OmniEvent, Detection } from "@/types/omni";
 
-import { buildDefaultHlsUrl, buildDefaultWebRtcUrl } from "@/lib/mediaUrls";
+import { buildCameraHlsUrl, buildCameraWebRtcUrl } from "@/lib/mediaUrls";
 
 export default function CameraDetail() {
   const { id } = useParams<{ id: string }>();
@@ -69,11 +69,11 @@ export default function CameraDetail() {
 
   // Build stream URLs from camera or fallback
   const hlsUrl = useMemo(
-    () => camera?.hlsUrl ?? (camera?.streamUrl ? buildDefaultHlsUrl(camera.id) : undefined),
+    () => camera?.hlsUrl ?? (camera?.streamUrl ? buildCameraHlsUrl(camera) : undefined),
     [camera],
   );
   const webrtcUrl = useMemo(
-    () => camera?.webrtcUrl ?? (camera?.streamUrl ? buildDefaultWebRtcUrl(camera.id) : undefined),
+    () => camera?.webrtcUrl ?? (camera?.streamUrl ? buildCameraWebRtcUrl(camera) : undefined),
     [camera],
   );
 

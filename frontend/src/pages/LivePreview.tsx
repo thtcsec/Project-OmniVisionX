@@ -20,7 +20,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from "lucide-react";
 import type { OmniEvent } from "@/types/omni";
 
-import { buildDefaultHlsUrl, buildDefaultWebRtcUrl } from "@/lib/mediaUrls";
+import { buildCameraHlsUrl, buildCameraWebRtcUrl } from "@/lib/mediaUrls";
 
 const CAMERA_NONE = "__none__";
 
@@ -39,11 +39,11 @@ export default function LivePreview() {
   });
 
   const hlsUrl = useMemo(
-    () => camera?.hlsUrl ?? (camera?.streamUrl ? buildDefaultHlsUrl(camera.id) : undefined),
+    () => camera?.hlsUrl ?? (camera?.streamUrl ? buildCameraHlsUrl(camera) : undefined),
     [camera],
   );
   const webrtcUrl = useMemo(
-    () => camera?.webrtcUrl ?? (camera?.streamUrl ? buildDefaultWebRtcUrl(camera.id) : undefined),
+    () => camera?.webrtcUrl ?? (camera?.streamUrl ? buildCameraWebRtcUrl(camera) : undefined),
     [camera],
   );
 
