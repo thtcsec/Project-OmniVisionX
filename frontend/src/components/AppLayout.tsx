@@ -3,15 +3,21 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { useSignalR } from "@/hooks/useSignalR";
 import { Outlet } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "@/hooks/use-toast";
 
 export function AppLayout() {
   const { status, events } = useSignalR();
+  const hasConnected = useRef(false);
 
-  // Toast on disconnect
   useEffect(() => {
-    if (status === "disconnected") {
+    if (status === "connected") {
+      hasConnected.current = true;
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (status === "disconnected" && hasConnected.current) {
       toast({ title: "Connection lost", description: "Real-time updates are unavailable. Reconnecting…", variant: "destructive" });
     }
   }, [status]);

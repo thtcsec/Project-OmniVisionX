@@ -9,14 +9,14 @@ export function useSignalR() {
   const [events, setEvents] = useState<OmniEvent[]>([]);
 
   useEffect(() => {
-    startConnection();
+    const unsubStatus = onConnectionStatus(setStatus);
     const unsubEvent = onOmniEvent((event) => {
       setEvents((prev) => [event, ...prev].slice(0, 100));
     });
-    const unsubStatus = onConnectionStatus(setStatus);
+    startConnection();
     return () => {
-      unsubEvent();
       unsubStatus();
+      unsubEvent();
       stopConnection();
     };
   }, []);
