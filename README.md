@@ -1,5 +1,9 @@
 # Project OmniVisionX — AI Vision Platform
 
+<p align="center">
+  <img src=".image/project-omnivisionx-white.png" alt="OmniVisionX" width="320" />
+</p>
+
 **Project OmniVisionX** is a modular AI vision stack aimed at traffic and scene understanding. It uses an **event-driven** architecture built on **Redis Streams**, with a **.NET 9** API and **SignalR** for real-time updates.
 
 ## Architecture
@@ -126,6 +130,25 @@ Stream URL accepts **rtsp(s)://** or **http(s)://** (e.g. HLS later). After muta
 
 Primary repo: [github.com/thtcsec/Project-OmniVisionX](https://github.com/thtcsec/Project-OmniVisionX) — update remote if needed:  
 `git remote set-url origin https://github.com/thtcsec/Project-OmniVisionX.git`
+
+## Docker — sau khi sửa code, chạy gì?
+
+`docker restart` **không** lấy code mới: container vẫn chạy **image cũ** đã build trước đó.
+
+| Tình huống | Lệnh gợi ý |
+|------------|------------|
+| Đổi **API** (.NET) | `docker compose build omni-api && docker compose up -d omni-api` |
+| Đổi **UI** (React) | `docker compose build omni-ui && docker compose up -d omni-ui` |
+| Đổi **cả hai** | `docker compose build omni-api omni-ui && docker compose up -d omni-api omni-ui` |
+| Muốn build lại sạch (ít cache) | `docker compose build --no-cache omni-api omni-ui && docker compose up -d omni-api omni-ui` |
+
+**Nhanh nhất khi dev UI:** chạy API trong Docker, còn frontend chạy local:
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+(Vite proxy `/api` và `/hubs` → `127.0.0.1:8080` — không cần rebuild `omni-ui` mỗi lần sửa React.)
 
 ## Hackathon
 

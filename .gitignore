@@ -59,3 +59,6 @@ obj/
 omni-vision-stream/
 backend/apis/bin/
 backend/apis/obj/
+
+# TypeScript incremental
+*.tsbuildinfo
