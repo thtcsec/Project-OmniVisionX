@@ -74,6 +74,8 @@ services:
       - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING:-Host=omni-db;Database=omnivision;Username=postgres;Password=admin}
       - Redis__ConnectionString=${REDIS_CONNECTION_STRING:-omni-bus:6379,abortConnect=false}
       - MediaMtx__ApiBaseUrl=http://omni-mediamtx:8997
+      - MediaMtx__H264RelayEnabled=${MEDIAMTX_H264_RELAY_ENABLED:-true}
+      - Simulator__ApiBaseUrl=http://omni-simulator:8554
     depends_on:
       omni-db:
         condition: service_healthy
@@ -118,6 +120,7 @@ services:
     environment:
       - REDIS_URL=redis://omni-bus:6379
       - DEVICE=cuda:0
+      - DATABASE_URL=postgresql+asyncpg://postgres:admin@omni-db:5432/omnivision
     volumes:
       - ./data/weights:/app/weights
       - ./data/shm:/app/shm
