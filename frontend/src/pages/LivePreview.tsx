@@ -16,13 +16,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Terminal } from "lucide-react";
 import type { OmniEvent } from "@/types/omni";
 
 const MEDIA_BASE = import.meta.env.OMNI_MEDIA_BASE_URL ?? "http://localhost:8888";
 
 export default function LivePreview() {
   const { t } = useI18n();
-  const [cameraId, setCameraId] = useState<string>("");
+  const [cameraId, setCameraId] = useState<string | undefined>(undefined);
   const [showTracks, setShowTracks] = useState(true);
   const [tracks, setTracks] = useState<Map<string, TrackOverlay>>(() => new Map());
 
@@ -94,6 +96,16 @@ export default function LivePreview() {
         <h1 className="text-2xl font-bold text-foreground">{t("live.title")}</h1>
         <p className="text-muted-foreground text-sm mt-1">{t("live.subtitle")}</p>
       </div>
+
+      <Alert className="border-amber-500/40 bg-amber-500/5">
+        <Terminal className="h-4 w-4" />
+        <AlertTitle>{t("live.troubleshootTitle")}</AlertTitle>
+        <AlertDescription className="text-xs mt-2 space-y-2 [&_code]:block [&_code]:text-[11px] [&_code]:bg-muted [&_code]:px-2 [&_code]:py-1 [&_code]:rounded [&_code]:mt-1">
+          <p>{t("live.troubleshootP1")}</p>
+          <code>docker compose --profile media up -d omni-mediamtx</code>
+          <p>{t("live.troubleshootP2")}</p>
+        </AlertDescription>
+      </Alert>
 
       <Card>
         <CardHeader className="pb-3">

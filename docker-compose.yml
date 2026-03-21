@@ -197,6 +197,28 @@ services:
       - omni-network
 
   # ============================================
+  # MEDIAMTX - RTSP → HLS / WebRTC (browser playback)
+  # UI defaults to http://localhost:8888/<cameraId>/index.m3u8
+  # Start: docker compose --profile media up -d omni-mediamtx
+  # Paths must point at your RTSP URLs (API / omni-object relay, or add paths via MediaMTX API).
+  # ============================================
+  omni-mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: omni-mediamtx
+    restart: unless-stopped
+    profiles:
+      - media
+    ports:
+      - "${MEDIAMTX_HLS_PORT:-8888}:8888"
+      - "${MEDIAMTX_WEBRTC_PORT:-8889}:8889"
+      - "${MEDIAMTX_RTSP_PORT:-18554}:8554"
+      - "${MEDIAMTX_API_PORT:-8997}:8997"
+    volumes:
+      - ./media-server/mediamtx.yml:/mediamtx.yml:ro
+    networks:
+      - omni-network
+
+  # ============================================
   # UI - React Frontend
   # ============================================
   omni-ui:
