@@ -11,7 +11,8 @@ function trimBase(url: string) {
 
 /** HLS + .m3u8 playlist base (default http://localhost:8888) */
 export function getMediaHlsBase(): string {
-  return trimBase(import.meta.env.OMNI_MEDIA_BASE_URL ?? "http://localhost:8888");
+  const env = import.meta.env.OMNI_MEDIA_BASE_URL?.trim();
+  return trimBase(env ? env : "http://localhost:8888");
 }
 
 /** WHEP endpoint base (default same host as HLS but port 8889) */
