@@ -67,11 +67,24 @@ app.MapHub<OmniHub>("/hubs/omni");
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "OmniAPI", version = "1.0.0" }));
 
-// Ensure database created
+// Ensure database created + patch existing cameras to enable LPR
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<OmniDbContext>();
     db.Database.EnsureCreated();
+
+    // Enable LPR for existing cameras that have a stream URL but never had EnablePlateOcr set
+    var camsToFix = db.Cameras
+        .Where(c => !string.IsNullOrEmpty(c.StreamUrl) && !c.EnablePlateOcr)
+        .ToList();
+    if (camsToFix.Count > 0)
+    {
+        foreach (var cam in camsToFix)
+            cam.EnablePlateOcr = true;
+        db.SaveChanges();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("Patched {Count} camera(s): EnablePlateOcr=true", camsToFix.Count);
+    }
 }
 
 app.Run();

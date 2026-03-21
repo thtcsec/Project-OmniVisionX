@@ -90,6 +90,7 @@ services:
       - OMNI_ELEVENLABS_MODEL_ID=${OMNI_ELEVENLABS_MODEL_ID:-eleven_multilingual_v2}
       - OMNI_EXA_API_KEY=${OMNI_EXA_API_KEY:-}
       - OMNI_DIFY_API_KEY=${OMNI_DIFY_API_KEY:-}
+      - OMNI_DIFY_BASE_URL=${OMNI_DIFY_BASE_URL:-}
       - OMNI_VALSEA_API_KEY=${OMNI_VALSEA_API_KEY:-}
       - OMNI_AGORA_APP_ID=${OMNI_AGORA_APP_ID:-}
       - OMNI_AGORA_APP_CERTIFICATE=${OMNI_AGORA_APP_CERTIFICATE:-}
@@ -196,7 +197,7 @@ services:
       - SNAPSHOT_INTERVAL=3
       - LPR_SCHEDULER_ENABLED=1
       - ENABLE_FORTRESS_LPR=false
-      - LPR_CAMERA_ALLOWLIST=51c6dfdf09de4de9866043d4684c88fe,d61bfb5a88a14b159b6c91439f23b2ad
+      - LPR_CAMERA_ALLOWLIST=
     volumes:
       - ./data/weights:/app/weights
       - ./data/shm:/app/shm

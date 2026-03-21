@@ -14,7 +14,7 @@ public class CameraWriteDto
     [RegularExpression("^(online|offline)$")]
     public string Status { get; set; } = "offline";
 
-    public bool EnableObjectDetection { get; set; }
-    public bool EnablePlateOcr { get; set; }
+    public bool EnableObjectDetection { get; set; } = true;
+    public bool EnablePlateOcr { get; set; } = true;
     public bool EnableFaceRecognition { get; set; }
 }

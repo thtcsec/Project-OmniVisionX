@@ -18,11 +18,6 @@ public sealed class IntegrationsEnvController : ControllerBase
         new("Qwen", "API Key",          "OMNI_QWEN_API_KEY",           true),
         new("Qwen", "Base URL",         "OMNI_QWEN_BASE_URL",          false),
         new("Qwen", "Model ID",         "OMNI_QWEN_MODEL_ID",          false),
-        new("Exa AI", "API Key",        "OMNI_EXA_API_KEY",            true),
-        new("Dify", "API Key",          "OMNI_DIFY_API_KEY",           true),
-        new("Dify", "App ID",           "OMNI_DIFY_APP_ID",            false),
-        new("Valsea", "API Key",        "OMNI_VALSEA_API_KEY",         true),
-        new("Valsea", "Org ID",         "OMNI_VALSEA_ORG_ID",          false),
     ];
 
     private readonly IConfiguration _configuration;
