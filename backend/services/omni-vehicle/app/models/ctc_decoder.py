@@ -69,8 +69,8 @@ class CTCDecoder:
 
         return text, confidence
 
-    def beam_search_decode(self, outputs: torch.Tensor, beam_width: int = 5,
-                          min_confidence: float = 0.3) -> List[Tuple[str, float]]:
+    def beam_search_decode(self, outputs: torch.Tensor, beam_width: int = 10,
+                          min_confidence: float = 0.25) -> List[Tuple[str, float]]:
         T, V = outputs.shape
 
         states = [BeamSearchState(sequence=[], confidence=1.0, prob=0.0)]
@@ -278,21 +278,21 @@ class TwoLineCTCDecoder:
         return text
 
     def _joint_decode(self, output_top: torch.Tensor, output_bottom: torch.Tensor,
-                     beam_width: int = 5) -> List[Tuple[str, str, float]]:
+                     beam_width: int = 10) -> List[Tuple[str, str, float]]:
         """
         Joint beam search decoding with VN Syntax Gate.
-        
+
         Instead of hard-rejecting invalid candidates, we use syntax scoring
-        to boost valid VN plates and demote invalid ones. This allows the 
+        to boost valid VN plates and demote invalid ones. This allows the
         system to produce fallback results even when no candidate perfectly
         matches the expected format.
-        
+
         Syntax Gate (from DeepSeek/Gemini research):
         - Valid top + valid bottom → 1.2× confidence boost
         - Invalid format → 0.7× confidence penalty
         """
-        candidates_top = self.decoder_top.beam_search_decode(output_top, beam_width, min_confidence=0.3)
-        candidates_bottom = self.decoder_bottom.beam_search_decode(output_bottom, beam_width, min_confidence=0.3)
+        candidates_top = self.decoder_top.beam_search_decode(output_top, beam_width, min_confidence=0.25)
+        candidates_bottom = self.decoder_bottom.beam_search_decode(output_bottom, beam_width, min_confidence=0.25)
 
         results = []
 
@@ -326,7 +326,7 @@ class TwoLineCTCDecoder:
         return results
 
     def decode(self, output_top: torch.Tensor, output_bottom: torch.Tensor,
-              beam_width: int = 5, use_beam_search: bool = True) -> Dict:
+              beam_width: int = 10, use_beam_search: bool = True) -> Dict:
         if use_beam_search:
             candidates = self._joint_decode(output_top, output_bottom, beam_width)
         else:

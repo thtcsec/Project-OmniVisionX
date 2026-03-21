@@ -41,14 +41,17 @@ class Settings(BaseSettings):
         json_schema_extra=_INFRA,
     )
     yolo_model: str = Field(
-        default="/app/weights/yolo11m.pt",
-        description="Đường dẫn file model YOLO cho Master Detector",
+        default="/app/weights/yolo11n.pt",
+        description="Đường dẫn file model YOLO cho Master Detector. "
+                    "yolo11n.pt (nano, ~6MB) nhẹ nhất — đủ cho tracking xe. "
+                    "yolo11s.pt nếu muốn cân bằng accuracy/speed. "
+                    "yolo11m.pt chỉ dùng khi VRAM ≥ 6GB.",
         json_schema_extra=_INFRA,
     )
 
     # ── YOLO Detection (tier: live) ───────────────────────────
     confidence_threshold: float = Field(
-        default=0.2, ge=0.05, le=0.95,
+        default=0.35, ge=0.05, le=0.95,
         description="Ngưỡng tin cậy YOLO — dưới giá trị này sẽ bỏ qua detection. "
                     "Nên bằng track_high_thresh để đồng bộ.",
         json_schema_extra=_LIVE,
@@ -62,29 +65,29 @@ class Settings(BaseSettings):
 
     # ── ByteTrack Tracking (tier: live) ───────────────────────
     track_high_thresh: float = Field(
-        default=0.2, ge=0.05, le=0.95,
+        default=0.35, ge=0.05, le=0.95,
         description="Ngưỡng cao của ByteTrack — detection ≥ giá trị này được tạo "
                     "track mới. PHẢI ≥ confidence_threshold, nếu không xe mới sẽ "
-                    "bị mất track.",
+                    "bị mất track. 0.35 giảm false-positive track cho yolo11n.",
         json_schema_extra=_LIVE,
     )
     track_low_thresh: float = Field(
-        default=0.1, ge=0.01, le=0.5,
+        default=0.15, ge=0.01, le=0.5,
         description="Ngưỡng thấp của ByteTrack — detection giữa low và high chỉ "
                     "dùng để duy trì track đã có, không tạo mới.",
         json_schema_extra=_LIVE,
     )
     track_buffer: int = Field(
-        default=60, ge=5, le=600,
+        default=30, ge=5, le=600,
         description="Số frame giữ track bị mất trước khi xóa. "
-                    "60 frames = 5s @ 12 FPS. Tăng nếu xe bị che khuất ngắn rồi quay lại. "
-                    "CRITICAL: Giảm từ 300→60 để tránh track zombie gây miss xe mới.",
+                    "30 frames = 2.5s @ 12 FPS — đủ cho occlusion ngắn, "
+                    "tránh zombie track gây miss xe mới.",
         json_schema_extra=_LIVE,
     )
     match_thresh: float = Field(
-        default=0.75, ge=0.3, le=0.99,
+        default=0.65, ge=0.3, le=0.99,
         description="Ngưỡng IoU để ghép detection vào track hiện có. "
-                    "0.75 tối ưu cho 12 FPS. Giảm nếu xe di chuyển cực nhanh (>80km/h).",
+                    "0.65 linh hoạt hơn khi xe chen/vượt nhau mà vẫn đủ chặt.",
         json_schema_extra=_LIVE,
     )
     frame_rate: int = Field(
@@ -101,9 +104,10 @@ class Settings(BaseSettings):
         json_schema_extra=_RESTART,
     )
     capture_fps: int = Field(
-        default=12, ge=1, le=30,
-        description="Số khung hình/giây lấy từ camera. Tăng = nhận diện xe nhanh "
-                    "tốt hơn, nhưng tốn GPU. 12 FPS tối ưu cho ≤8 camera.",
+        default=6, ge=1, le=30,
+        description="Số khung hình/giây lấy từ camera. "
+                    "6 FPS đủ cho LPR (biển số rõ sau 3-4 frame) và giảm tải GPU đáng kể. "
+                    "Tăng lên 10-12 nếu có GPU ≥ 6GB và cần tracking xe tốc độ cao.",
         json_schema_extra=_RESTART,
     )
     capture_buffer_size: int = Field(
@@ -125,9 +129,9 @@ class Settings(BaseSettings):
         json_schema_extra=_RESTART,
     )
     batch_inference_size: int = Field(
-        default=4, ge=1, le=16,
-        description="Số camera gộp vào một lần YOLO batch inference. Tăng để tận dụng GPU tốt hơn, "
-                    "giảm nếu VRAM hạn chế hoặc camera lệch độ phân giải quá nhiều.",
+        default=2, ge=1, le=16,
+        description="Số camera gộp vào một lần YOLO batch inference. "
+                    "2 là tối ưu cho yolo11n với GPU 4GB. Tăng lên 4-8 nếu VRAM ≥ 6GB.",
         json_schema_extra=_RESTART,
     )
     batch_collect_window_ms: int = Field(

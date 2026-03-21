@@ -129,7 +129,7 @@ def refine_vehicle_type(
 
 
 class VehicleBboxSmoother:
-    def __init__(self, alpha: float = 0.4, ttl_s: float = 4.0):
+    def __init__(self, alpha: float = 0.25, ttl_s: float = 2.5):
         self._cache: dict[str, tuple[float, tuple[int, int, int, int]]] = {}
         self._alpha = max(0.05, min(0.95, float(alpha)))
         self._ttl_s = max(0.5, float(ttl_s))

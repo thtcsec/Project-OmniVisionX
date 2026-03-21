@@ -24,7 +24,7 @@ class _Track:
 
 
 class SimpleTracker:
-    def __init__(self, iou_threshold: float = 0.3, max_age_seconds: float = 1.0, min_hits: int = 2) -> None:
+    def __init__(self, iou_threshold: float = 0.45, max_age_seconds: float = 1.5, min_hits: int = 2) -> None:
         self.iou_threshold = iou_threshold
         self.max_age_seconds = max_age_seconds
         self.min_hits = min_hits
@@ -114,8 +114,8 @@ class TrackerManager:
     def get_tracker(
         self,
         camera_id: str,
-        iou_threshold: float = 0.3,
-        max_age_seconds: float = 1.0,
+        iou_threshold: float = 0.45,
+        max_age_seconds: float = 1.5,
         min_hits: int = 2,
     ) -> SimpleTracker:
         now = time.time()

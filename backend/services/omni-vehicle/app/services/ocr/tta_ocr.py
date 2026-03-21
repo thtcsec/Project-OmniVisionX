@@ -47,76 +47,66 @@ class TTAResult:
 class TTAAugmentor:
     """
     Apply test-time augmentations to plate images.
+    4 targeted passes thay vì 6-8 random — đủ để cover các trường hợp thực tế
+    mà không tốn gấp đôi CPU.
     """
-    
-    def __init__(self, num_augmentations: int = 6):
+
+    def __init__(self, num_augmentations: int = 4):
         """
         Args:
-            num_augmentations: Number of augmented versions to create
+            num_augmentations: Number of augmented versions to create (default 4)
         """
         self.num_augmentations = num_augmentations
-    
+
     def generate_augmentations(self, img: np.ndarray) -> List[Tuple[np.ndarray, str]]:
         """
-        Generate augmented versions of input image.
-        
+        Generate targeted augmented versions of input image.
+        4 passes covering the most common plate degradation scenarios:
+        - Original (baseline)
+        - CLAHE adaptive (low-contrast plates)
+        - Unsharp mask (motion blur / slightly soft)
+        - Gamma 0.8 (overexposed / glare from retroreflective plates)
+
         Returns:
             List of (augmented_image, augmentation_name)
         """
         augmented = []
-        
-        # 0. Original
+
+        # 0. Original — always include
         augmented.append((img.copy(), "original"))
-        
-        # 1. Brightness +20%
-        bright = self._adjust_brightness(img, 1.2)
-        augmented.append((bright, "bright+20%"))
-        
-        # 2. Brightness -15%
-        dark = self._adjust_brightness(img, 0.85)
-        augmented.append((dark, "bright-15%"))
-        
-        # 3. Contrast +15%
-        high_contrast = self._adjust_contrast(img, 1.15)
-        augmented.append((high_contrast, "contrast+15%"))
-        
-        # 4. Gamma 0.8 (darker midtones)
+
+        # 1. CLAHE adaptive — handles low-contrast, faded plates
+        clahe = self._apply_clahe(img)
+        augmented.append((clahe, "clahe"))
+
+        # 2. Unsharp mask — recovers slightly soft/blurred characters
+        sharp = self._unsharp_mask(img)
+        augmented.append((sharp, "unsharp"))
+
+        # 3. Gamma 0.8 — reduces glare on overexposed retroreflective plates
         gamma_low = self._adjust_gamma(img, 0.8)
         augmented.append((gamma_low, "gamma0.8"))
-        
-        # 5. Gamma 1.3 (brighter midtones)
-        gamma_high = self._adjust_gamma(img, 1.3)
-        augmented.append((gamma_high, "gamma1.3"))
-        
-        if self.num_augmentations > 6:
-            # 6. CLAHE enhancement
-            clahe = self._apply_clahe(img)
-            augmented.append((clahe, "clahe"))
-            
-            # 7. Sharpening
-            sharp = self._sharpen(img)
-            augmented.append((sharp, "sharpen"))
-        
+
         return augmented[:self.num_augmentations]
     
     def _adjust_brightness(self, img: np.ndarray, factor: float) -> np.ndarray:
         """Adjust image brightness by factor."""
         return np.clip(img.astype(np.float32) * factor, 0, 255).astype(np.uint8)
-    
+
     def _adjust_contrast(self, img: np.ndarray, factor: float) -> np.ndarray:
         """Adjust image contrast by factor."""
         mean = np.mean(img)
         return np.clip((img.astype(np.float32) - mean) * factor + mean, 0, 255).astype(np.uint8)
-    
+
     def _adjust_gamma(self, img: np.ndarray, gamma: float) -> np.ndarray:
         """Apply gamma correction."""
         inv_gamma = 1.0 / gamma
         table = np.array([((i / 255.0) ** inv_gamma) * 255
                           for i in np.arange(0, 256)]).astype(np.uint8)
         return cv2.LUT(img, table)
-    
+
     def _apply_clahe(self, img: np.ndarray) -> np.ndarray:
-        """Apply CLAHE enhancement."""
+        """Apply CLAHE enhancement — handles low-contrast / faded plates."""
         if len(img.shape) == 3:
             lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
             l, a, b = cv2.split(lab)
@@ -127,7 +117,7 @@ class TTAAugmentor:
         else:
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             return clahe.apply(img)
-    
+
     def _sharpen(self, img: np.ndarray) -> np.ndarray:
         """Apply sharpening kernel."""
         kernel = np.array([[-1, -1, -1],
@@ -135,27 +125,33 @@ class TTAAugmentor:
                            [-1, -1, -1]])
         return cv2.filter2D(img, -1, kernel)
 
+    def _unsharp_mask(self, img: np.ndarray, sigma: float = 1.0, strength: float = 1.5) -> np.ndarray:
+        """Unsharp mask — better than simple sharpen for motion-blurred plates."""
+        blurred = cv2.GaussianBlur(img, (0, 0), sigma)
+        return np.clip(img.astype(np.float32) + strength * (img.astype(np.float32) - blurred.astype(np.float32)), 0, 255).astype(np.uint8)
+
 
 class TTAOCR:
     """
     Phase 2.1: Test-Time Augmentation OCR.
-    
-    Runs OCR on multiple augmented versions and votes on result.
-    
+
+    Runs OCR on 4 targeted augmented versions and votes on result.
+    4 passes thay vì 6-8 — tiết kiệm ~40% CPU, coverage tốt hơn nhờ targeted.
+
     Usage:
         tta = TTAOCR(ocr_func=paddle_ocr.ocr_single)
         result = tta.recognize(plate_image)
         print(f"Plate: {result.plate_text}, Conf: {result.confidence:.2f}")
     """
-    
-    def __init__(self, 
+
+    def __init__(self,
                  ocr_func: Callable[[np.ndarray], Tuple[str, float]],
-                 num_augmentations: int = 6,
+                 num_augmentations: int = 4,
                  min_confidence: float = 0.3):
         """
         Args:
             ocr_func: Function that takes image and returns (text, confidence)
-            num_augmentations: Number of augmented versions to process
+            num_augmentations: Number of augmented versions to process (default 4)
             min_confidence: Minimum confidence to include in voting
         """
         self.ocr_func = ocr_func
@@ -310,6 +306,6 @@ class TTAOCR:
         return normalized
 
 
-def create_tta_ocr(ocr_func: Callable, num_augmentations: int = 6) -> TTAOCR:
-    """Factory function to create TTA OCR instance."""
+def create_tta_ocr(ocr_func: Callable, num_augmentations: int = 4) -> TTAOCR:
+    """Factory function to create TTA OCR instance. Default 4 targeted passes."""
     return TTAOCR(ocr_func=ocr_func, num_augmentations=num_augmentations)
