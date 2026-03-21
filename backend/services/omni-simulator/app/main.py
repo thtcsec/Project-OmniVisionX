@@ -28,6 +28,7 @@ class CameraConfig(BaseModel):
     video_path: str
     loop: bool = True
     fps: int = 30
+    transcode_h264: bool = True
 
 
 class RelayConfig(BaseModel):
@@ -39,19 +40,22 @@ class RelayConfig(BaseModel):
 _active_cameras: Dict[str, subprocess.Popen] = {}
 _ffmpeg_processes: Dict[str, subprocess.Popen] = {}
 _active_relays: Dict[str, subprocess.Popen] = {}
-_videos_dir = "/videos"
+_videos_dirs = [
+    p.strip()
+    for p in os.getenv("OMNI_SIMULATOR_VIDEOS_DIRS", "/videos,/videos-legacy,/data,/data/videos").split(",")
+    if p.strip()
+]
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🚀 OmniSimulator Starting...")
-    logger.info(f"   Videos directory: {_videos_dir}")
+    logger.info(f"   Videos directories: {_videos_dirs}")
     
     # Auto-start cameras from videos directory
-    if os.path.exists(_videos_dir):
-        for video_file in Path(_videos_dir).glob("*.mp4"):
-            cam_id = f"cam-{video_file.stem}"
-            await start_camera(cam_id, str(video_file))
+    for video_file in _iter_video_files():
+        cam_id = f"cam-{video_file.stem}"
+        await start_camera(cam_id, str(video_file))
     
     logger.info("✅ OmniSimulator Ready!")
     logger.info(f"   RTSP URLs available at: rtsp://localhost:8554/<camera-id>")
@@ -89,7 +93,7 @@ app.add_middleware(
 )
 
 
-async def start_camera(camera_id: str, video_path: str, loop: bool = True) -> bool:
+async def start_camera(camera_id: str, video_path: str, loop: bool = True, fps: int = 30, transcode_h264: bool = True) -> bool:
     """
     Start RTSP stream for a video file using ffmpeg.
     RTSP URL will be: rtsp://localhost:8554/{camera_id}
@@ -102,17 +106,33 @@ async def start_camera(camera_id: str, video_path: str, loop: bool = True) -> bo
         logger.error(f"Video file not found: {video_path}")
         return False
 
-    # ffmpeg command to serve video as RTSP
-    # - Stream copy for efficiency (no re-encoding)
-    # - Loop for continuous playback
+    publish_host = os.getenv("OMNI_MEDIAMTX_RTSP_PUBLISH_HOST", "omni-mediamtx")
+    publish_port = os.getenv("OMNI_MEDIAMTX_RTSP_PUBLISH_PORT", "8554")
+    publish_url = f"rtsp://{publish_host}:{publish_port}/{camera_id}"
+
     cmd = [
         "ffmpeg",
         "-re",                          # Read input at native frame rate
         "-stream_loop", "-1" if loop else "0",  # Loop forever
         "-i", video_path,               # Input file
-        "-c", "copy",                   # Copy streams (no re-encode)
+    ]
+
+    if transcode_h264:
+        cmd += [
+            "-an",
+            "-c:v", "libx264",
+            "-preset", os.getenv("OMNI_SIMULATOR_X264_PRESET", "veryfast"),
+            "-tune", os.getenv("OMNI_SIMULATOR_X264_TUNE", "zerolatency"),
+            "-pix_fmt", "yuv420p",
+            "-r", str(fps),
+        ]
+    else:
+        cmd += ["-c", "copy"]
+
+    cmd += [
         "-f", "rtsp",                   # Output format RTSP
-        f"rtsp://localhost:8554/{camera_id}"
+        "-rtsp_transport", "tcp",
+        publish_url,
     ]
 
     try:
@@ -123,7 +143,7 @@ async def start_camera(camera_id: str, video_path: str, loop: bool = True) -> bo
             preexec_fn=os.setsid  # Create new process group for cleanup
         )
         _active_cameras[camera_id] = process
-        logger.info(f"Started camera {camera_id} -> rtsp://localhost:8554/{camera_id}")
+        logger.info("Started camera %s -> %s", camera_id, publish_url)
         return True
     except Exception as e:
         logger.error(f"Failed to start camera {camera_id}: {e}")
@@ -242,15 +262,20 @@ async def health():
 
 
 @app.post("/simulator/cameras/{camera_id}/start")
-async def api_start_camera(camera_id: str, video_path: str, loop: bool = True):
+async def api_start_camera(camera_id: str, video_path: str, loop: bool = True, fps: int = 30, transcode_h264: bool = True):
     """Start a mock camera stream."""
-    success = await start_camera(camera_id, video_path, loop)
+    success = await start_camera(camera_id, video_path, loop, fps, transcode_h264)
     if not success:
         raise HTTPException(status_code=400, detail="Failed to start camera")
+    publish_host = os.getenv("OMNI_MEDIAMTX_RTSP_PUBLISH_HOST", "omni-mediamtx")
+    publish_port = os.getenv("OMNI_MEDIAMTX_RTSP_PUBLISH_PORT", "8554")
     return {
         "camera_id": camera_id,
-        "rtsp_url": f"rtsp://localhost:8554/{camera_id}",
-        "video_path": video_path
+        "rtsp_url": f"rtsp://{publish_host}:{publish_port}/{camera_id}",
+        "video_path": video_path,
+        "loop": loop,
+        "fps": fps,
+        "transcode_h264": transcode_h264,
     }
 
 
@@ -302,10 +327,12 @@ async def list_cameras():
     """List all cameras and their status."""
     cameras = []
     for cam_id in _active_cameras:
+        publish_host = os.getenv("OMNI_MEDIAMTX_RTSP_PUBLISH_HOST", "omni-mediamtx")
+        publish_port = os.getenv("OMNI_MEDIAMTX_RTSP_PUBLISH_PORT", "8554")
         cameras.append({
             "camera_id": cam_id,
             "status": "running" if _active_cameras[cam_id].poll() is None else "stopped",
-            "rtsp_url": f"rtsp://localhost:8554/{cam_id}"
+            "rtsp_url": f"rtsp://{publish_host}:{publish_port}/{cam_id}"
         })
     return {"cameras": cameras}
 
@@ -313,18 +340,39 @@ async def list_cameras():
 @app.get("/simulator/videos")
 async def list_videos():
     """List available video files."""
-    if not os.path.exists(_videos_dir):
-        return {"videos": []}
-    
     videos = []
-    for video_file in Path(_videos_dir).glob("*"):
-        if video_file.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']:
-            videos.append({
-                "filename": video_file.name,
-                "path": str(video_file),
-                "size_mb": round(video_file.stat().st_size / (1024 * 1024), 2)
-            })
+    for video_file in _iter_video_files():
+        videos.append({
+            "filename": video_file.name,
+            "path": str(video_file),
+            "size_mb": round(video_file.stat().st_size / (1024 * 1024), 2)
+        })
     return {"videos": videos}
+
+
+@app.post("/simulator/videos/rescan")
+async def rescan_videos(auto_start: bool = False):
+    if auto_start:
+        for video_file in _iter_video_files():
+            cam_id = f"cam-{video_file.stem}"
+            if cam_id not in _active_cameras:
+                await start_camera(cam_id, str(video_file))
+    return await list_videos()
+
+
+def _iter_video_files():
+    exts = {".mp4", ".avi", ".mov", ".mkv"}
+    seen: set[str] = set()
+    for base in _videos_dirs:
+        if not os.path.exists(base):
+            continue
+        for video_file in Path(base).glob("*"):
+            if video_file.is_file() and video_file.suffix.lower() in exts:
+                key = str(video_file)
+                if key in seen:
+                    continue
+                seen.add(key)
+                yield video_file
 
 
 if __name__ == "__main__":
