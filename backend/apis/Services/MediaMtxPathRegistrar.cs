@@ -41,6 +41,9 @@ public sealed class MediaMtxPathRegistrar
             || !streamUrl.Trim().StartsWith("rtsp", StringComparison.OrdinalIgnoreCase))
             return true;
 
+        if (IsMediaMtxSelfSource(streamUrl))
+            return true;
+
         var path = Uri.EscapeDataString(cameraId);
         var url = $"{baseUrl}/v3/config/paths/replace/{path}";
         var payload = new MediaMtxPathPayload();
@@ -112,6 +115,22 @@ public sealed class MediaMtxPathRegistrar
             _logger.LogWarning(ex, "Simulator relay unreachable for camera {CameraId}", cameraId);
             return false;
         }
+    }
+
+    private static bool IsMediaMtxSelfSource(string streamUrl)
+    {
+        if (!Uri.TryCreate(streamUrl.Trim(), UriKind.Absolute, out var u))
+            return false;
+        if (!string.Equals(u.Scheme, "rtsp", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(u.Scheme, "rtsps", StringComparison.OrdinalIgnoreCase))
+            return false;
+        var host = u.Host.Trim().ToLowerInvariant();
+        if (host != "omni-mediamtx" && host != "localhost" && host != "127.0.0.1")
+            return false;
+        var port = u.IsDefaultPort ? 0 : u.Port;
+        if (port != 0 && port != 8554 && port != 18554)
+            return false;
+        return u.AbsolutePath.Trim('/').Length > 0;
     }
 
     private sealed class MediaMtxPathPayload

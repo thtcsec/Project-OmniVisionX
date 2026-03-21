@@ -63,6 +63,9 @@ public class CamerasController : ControllerBase
 
         await _hub.Clients.Group("omni-all").SendAsync("CamerasChanged", new { action = "created", id = camera.Id });
 
+        if (string.Equals(camera.Status, "online", StringComparison.OrdinalIgnoreCase))
+            await _mediaMtx.TryRegisterPathAsync(camera.Id, camera.StreamUrl);
+
         return CreatedAtAction(nameof(GetCamera), new { id = camera.Id }, camera);
     }
 
