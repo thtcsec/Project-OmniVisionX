@@ -30,9 +30,15 @@ class CameraConfig(BaseModel):
     fps: int = 30
 
 
+class RelayConfig(BaseModel):
+    source_url: str
+    transcode_h264: bool = True
+
+
 # Global state
 _active_cameras: Dict[str, subprocess.Popen] = {}
 _ffmpeg_processes: Dict[str, subprocess.Popen] = {}
+_active_relays: Dict[str, subprocess.Popen] = {}
 _videos_dir = "/videos"
 
 
@@ -140,6 +146,89 @@ async def stop_camera(camera_id: str) -> bool:
     return True
 
 
+async def start_relay(camera_id: str, source_url: str, transcode_h264: bool = True) -> bool:
+    if camera_id in _active_relays:
+        logger.warning("Relay %s already running", camera_id)
+        return False
+
+    source = (source_url or "").strip()
+    if not source:
+        return False
+
+    publish_host = os.getenv("OMNI_MEDIAMTX_RTSP_PUBLISH_HOST", "omni-mediamtx")
+    publish_port = os.getenv("OMNI_MEDIAMTX_RTSP_PUBLISH_PORT", "8554")
+    publish_url = f"rtsp://{publish_host}:{publish_port}/{camera_id}"
+
+    cmd: list[str] = [
+        "ffmpeg",
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "warning",
+    ]
+
+    if source.lower().startswith("rtsp://") or source.lower().startswith("rtsps://"):
+        cmd += ["-rtsp_transport", os.getenv("OMNI_RELAY_RTSP_TRANSPORT", "tcp")]
+
+    cmd += ["-i", source]
+
+    if transcode_h264:
+        fps = os.getenv("OMNI_RELAY_FPS", "").strip()
+        gop = os.getenv("OMNI_RELAY_GOP", "").strip()
+        cmd += [
+            "-an",
+            "-c:v",
+            "libx264",
+            "-preset",
+            os.getenv("OMNI_RELAY_X264_PRESET", "veryfast"),
+            "-tune",
+            os.getenv("OMNI_RELAY_X264_TUNE", "zerolatency"),
+            "-pix_fmt",
+            "yuv420p",
+        ]
+        if fps:
+            cmd += ["-r", fps]
+        if gop:
+            cmd += ["-g", gop, "-keyint_min", gop, "-sc_threshold", "0"]
+    else:
+        cmd += ["-c", "copy"]
+
+    cmd += [
+        "-f",
+        "rtsp",
+        "-rtsp_transport",
+        "tcp",
+        publish_url,
+    ]
+
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            preexec_fn=os.setsid,
+        )
+        _active_relays[camera_id] = process
+        logger.info("Started relay %s -> %s", camera_id, publish_url)
+        return True
+    except Exception as e:
+        logger.error("Failed to start relay %s: %s", camera_id, e)
+        return False
+
+
+async def stop_relay(camera_id: str) -> bool:
+    if camera_id not in _active_relays:
+        return False
+
+    process = _active_relays.pop(camera_id)
+    try:
+        os.killpg(os.getpgid(process.pid), 9)
+        process.wait(timeout=5)
+    except Exception as e:
+        logger.warning("Error stopping relay %s: %s", camera_id, e)
+    return True
+
+
 @app.get("/simulator/health")
 async def health():
     """Health check."""
@@ -147,7 +236,8 @@ async def health():
         "status": "healthy",
         "service": "omni-simulator",
         "version": "1.0.0",
-        "active_cameras": list(_active_cameras.keys())
+        "active_cameras": list(_active_cameras.keys()),
+        "active_relays": list(_active_relays.keys()),
     }
 
 
@@ -171,6 +261,40 @@ async def api_stop_camera(camera_id: str):
     if not success:
         raise HTTPException(status_code=404, detail="Camera not found")
     return {"message": f"Camera {camera_id} stopped"}
+
+
+@app.post("/simulator/relays/{camera_id}/start")
+async def api_start_relay(camera_id: str, cfg: RelayConfig):
+    success = await start_relay(camera_id, cfg.source_url, cfg.transcode_h264)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to start relay")
+    publish_host = os.getenv("OMNI_MEDIAMTX_RTSP_PUBLISH_HOST", "omni-mediamtx")
+    publish_port = os.getenv("OMNI_MEDIAMTX_RTSP_PUBLISH_PORT", "8554")
+    return {
+        "camera_id": camera_id,
+        "publish_url": f"rtsp://{publish_host}:{publish_port}/{camera_id}",
+        "source_url": cfg.source_url,
+        "transcode_h264": cfg.transcode_h264,
+    }
+
+
+@app.post("/simulator/relays/{camera_id}/stop")
+async def api_stop_relay(camera_id: str):
+    success = await stop_relay(camera_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Relay not found")
+    return {"message": f"Relay {camera_id} stopped"}
+
+
+@app.get("/simulator/relays")
+async def list_relays():
+    relays = []
+    for cam_id in _active_relays:
+        relays.append({
+            "camera_id": cam_id,
+            "status": "running" if _active_relays[cam_id].poll() is None else "stopped",
+        })
+    return {"relays": relays}
 
 
 @app.get("/simulator/cameras")
