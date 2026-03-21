@@ -27,6 +27,8 @@ public sealed class MediaMtxPathRegistrar
         !string.IsNullOrWhiteSpace(_configuration["MediaMtx:ApiBaseUrl"]);
 
     private string? ApiBaseUrl => _configuration["MediaMtx:ApiBaseUrl"]?.TrimEnd('/');
+    private bool H264RelayEnabled => string.Equals(_configuration["MediaMtx:H264RelayEnabled"], "true", StringComparison.OrdinalIgnoreCase);
+    private string SimulatorApiBaseUrl => (_configuration["Simulator:ApiBaseUrl"] ?? "http://omni-simulator:8554").TrimEnd('/');
 
     /// <returns>true if skipped (not RTSP / offline / no config) or HTTP 200/204.</returns>
     public async Task<bool> TryRegisterPathAsync(string cameraId, string streamUrl, CancellationToken ct = default)
@@ -41,13 +43,24 @@ public sealed class MediaMtxPathRegistrar
 
         var path = Uri.EscapeDataString(cameraId);
         var url = $"{baseUrl}/v3/config/paths/replace/{path}";
-        var payload = new MediaMtxPathPayload
+        var payload = new MediaMtxPathPayload();
+
+        if (H264RelayEnabled)
         {
-            Source = streamUrl.Trim(),
-            SourceOnDemand = true,
-            SourceOnDemandStartTimeout = "15s",
-            SourceOnDemandCloseAfter = "5m",
-        };
+            var relayOk = await TryStartSimulatorRelayAsync(cameraId, streamUrl.Trim(), ct);
+            if (!relayOk)
+                return false;
+
+            payload.Source = "publisher";
+            payload.SourceOnDemand = false;
+        }
+        else
+        {
+            payload.Source = streamUrl.Trim();
+            payload.SourceOnDemand = true;
+            payload.SourceOnDemandStartTimeout = "15s";
+            payload.SourceOnDemandCloseAfter = "5m";
+        }
 
         try
         {
@@ -73,6 +86,34 @@ public sealed class MediaMtxPathRegistrar
         }
     }
 
+    private async Task<bool> TryStartSimulatorRelayAsync(string cameraId, string sourceUrl, CancellationToken ct)
+    {
+        try
+        {
+            var url = $"{SimulatorApiBaseUrl}/simulator/relays/{Uri.EscapeDataString(cameraId)}/start";
+            var body = new SimulatorRelayStartBody
+            {
+                SourceUrl = sourceUrl,
+                TranscodeH264 = true,
+            };
+            var res = await _http.PostAsJsonAsync(url, body, ct);
+            if (res.IsSuccessStatusCode)
+                return true;
+            var txt = await res.Content.ReadAsStringAsync(ct);
+            _logger.LogWarning(
+                "Simulator relay start failed for {CameraId}: {Status} {Body}",
+                cameraId,
+                (int)res.StatusCode,
+                txt.Length > 200 ? txt[..200] : txt);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Simulator relay unreachable for camera {CameraId}", cameraId);
+            return false;
+        }
+    }
+
     private sealed class MediaMtxPathPayload
     {
         [JsonPropertyName("source")]
@@ -86,5 +127,14 @@ public sealed class MediaMtxPathRegistrar
 
         [JsonPropertyName("sourceOnDemandCloseAfter")]
         public string SourceOnDemandCloseAfter { get; set; } = "5m";
+    }
+
+    private sealed class SimulatorRelayStartBody
+    {
+        [JsonPropertyName("source_url")]
+        public string SourceUrl { get; set; } = "";
+
+        [JsonPropertyName("transcode_h264")]
+        public bool TranscodeH264 { get; set; } = true;
     }
 }
