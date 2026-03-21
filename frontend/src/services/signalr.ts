@@ -9,6 +9,7 @@ const HUB_PATH = import.meta.env.OMNI_SIGNALR_HUB_PATH ?? "/hubs/omni";
 let connection: signalR.HubConnection | null = null;
 const listeners = new Set<(event: OmniEvent) => void>();
 const statusListeners = new Set<(status: "connected" | "disconnected" | "reconnecting") => void>();
+const camerasChangedListeners = new Set<() => void>();
 
 function notifyStatus(status: "connected" | "disconnected" | "reconnecting") {
   statusListeners.forEach((fn) => fn(status));
@@ -24,6 +25,10 @@ export function getConnection(): signalR.HubConnection {
 
     connection.on("OmniEvent", (event: OmniEvent) => {
       listeners.forEach((fn) => fn(event));
+    });
+
+    connection.on("CamerasChanged", () => {
+      camerasChangedListeners.forEach((fn) => fn());
     });
 
     connection.onreconnecting(() => notifyStatus("reconnecting"));
@@ -78,4 +83,10 @@ export function onOmniEvent(callback: (event: OmniEvent) => void) {
 export function onConnectionStatus(callback: (status: "connected" | "disconnected" | "reconnecting") => void) {
   statusListeners.add(callback);
   return () => { statusListeners.delete(callback); };
+}
+
+/** Invalidate camera queries when API mutates list (multi-tab / other clients). */
+export function onCamerasChanged(callback: () => void) {
+  camerasChangedListeners.add(callback);
+  return () => { camerasChangedListeners.delete(callback); };
 }

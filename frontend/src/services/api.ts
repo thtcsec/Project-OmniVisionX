@@ -1,6 +1,8 @@
 import type { Camera, DashboardStats, Detection, PlateResult, SimulatorCamera, SimulatorVideo } from "@/types/omni";
 
-const API_BASE = import.meta.env.OMNI_API_BASE_URL ?? "http://localhost:8080";
+/** Same-origin in prod + Vite proxy in dev; override with OMNI_API_BASE_URL if needed */
+const API_BASE = (import.meta.env.OMNI_API_BASE_URL as string | undefined) ?? "";
+
 const SIM_BASE = import.meta.env.OMNI_SIMULATOR_BASE_URL ?? "http://localhost:8554";
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -13,8 +15,21 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     },
     ...options,
   });
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
-  return res.json();
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const j = await res.json();
+      if (j?.error) detail = String(j.error);
+      else if (j?.title) detail = String(j.title);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(`API ${res.status}: ${detail}`);
+  }
+  if (res.status === 204) return undefined as T;
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 function simulatorVideosFromResponse(payload: unknown): SimulatorVideo[] {
@@ -63,9 +78,74 @@ function simulatorCamerasFromResponse(payload: unknown): SimulatorCamera[] {
     });
 }
 
+/** Map .NET API (camelCase) → UI Camera */
+export function normalizeCamera(raw: Record<string, unknown>): Camera {
+  const id = String(raw.id ?? "");
+  const name = String(raw.name ?? "");
+  const status: "online" | "offline" = raw.status === "online" ? "online" : "offline";
+  const features = {
+    objectDetection: Boolean(raw.enableObjectDetection ?? (raw.features as Record<string, unknown>)?.objectDetection),
+    plateRecognition: Boolean(raw.enablePlateOcr ?? (raw.features as Record<string, unknown>)?.plateRecognition),
+    faceDetection: Boolean(raw.enableFaceRecognition ?? (raw.features as Record<string, unknown>)?.faceDetection),
+  };
+  return {
+    id,
+    name,
+    status,
+    streamUrl: typeof raw.streamUrl === "string" ? raw.streamUrl : undefined,
+    hlsUrl: typeof raw.hlsUrl === "string" ? raw.hlsUrl : undefined,
+    webrtcUrl: typeof raw.webrtcUrl === "string" ? raw.webrtcUrl : undefined,
+    features,
+    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : undefined,
+    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : undefined,
+  };
+}
+
+function cameraToApiBody(values: {
+  name: string;
+  streamUrl: string;
+  status: "online" | "offline";
+  enableObjectDetection: boolean;
+  enablePlateOcr: boolean;
+  enableFaceRecognition: boolean;
+}) {
+  return {
+    name: values.name,
+    streamUrl: values.streamUrl,
+    status: values.status,
+    enableObjectDetection: values.enableObjectDetection,
+    enablePlateOcr: values.enablePlateOcr,
+    enableFaceRecognition: values.enableFaceRecognition,
+  };
+}
+
 // Cameras
-export const fetchCameras = () => request<Camera[]>(`${API_BASE}/api/Cameras`);
-export const fetchCamera = (id: string) => request<Camera>(`${API_BASE}/api/Cameras/${id}`);
+export const fetchCameras = async () => {
+  const list = await request<Record<string, unknown>[]>(`${API_BASE}/api/Cameras`);
+  return Array.isArray(list) ? list.map(normalizeCamera) : [];
+};
+
+export const fetchCamera = async (id: string) => {
+  const raw = await request<Record<string, unknown>>(`${API_BASE}/api/Cameras/${encodeURIComponent(id)}`);
+  return normalizeCamera(raw);
+};
+
+export const createCamera = (values: Parameters<typeof cameraToApiBody>[0]) =>
+  request<Record<string, unknown>>(`${API_BASE}/api/Cameras`, {
+    method: "POST",
+    body: JSON.stringify(cameraToApiBody(values)),
+  }).then(normalizeCamera);
+
+export const updateCamera = (id: string, values: Parameters<typeof cameraToApiBody>[0]) =>
+  request<void>(`${API_BASE}/api/Cameras/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(cameraToApiBody(values)),
+  });
+
+export const deleteCamera = (id: string) =>
+  request<void>(`${API_BASE}/api/Cameras/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 
 // Detections
 export const fetchDetections = (params?: { cameraId?: string; from?: string; to?: string }) => {

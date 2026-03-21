@@ -1,11 +1,11 @@
-# Project OmniVision — AI Vision Platform
+# Project OmniVisionX — AI Vision Platform
 
-**Project OmniVision** is a modular AI vision stack aimed at traffic and scene understanding. It uses an **event-driven** architecture built on **Redis Streams**, with a **.NET 9** API and **SignalR** for real-time updates.
+**Project OmniVisionX** is a modular AI vision stack aimed at traffic and scene understanding. It uses an **event-driven** architecture built on **Redis Streams**, with a **.NET 9** API and **SignalR** for real-time updates.
 
 ## Architecture
 
 ```
-Project OmniVision/
+Project OmniVisionX/
 ├── backend/
 │   ├── apis/                 # .NET 9 Web API + SignalR
 │   │   ├── Controllers/      # REST endpoints
@@ -103,6 +103,16 @@ Control API (FastAPI on the simulator port):
 
 Browsers do not play raw RTSP; use **HLS** or **WebRTC** via a relay such as **MediaMTX** for live preview in the web UI.
 
+## Cameras (CRUD)
+
+The web UI under **Cameras** supports **create / read / update / delete** via `GET|POST|PUT|DELETE /api/Cameras`.  
+Stream URL accepts **rtsp(s)://** or **http(s)://** (e.g. HLS later). After mutations, clients subscribed to SignalR receive **`CamerasChanged`** so lists refresh across tabs.
+
+## Security note (hackathon vs production)
+
+**Hackathon build:** API and CRUD are **open** (no JWT / roles) so judges can try flows quickly.  
+**Production:** add authentication (e.g. ASP.NET Identity + JWT or API keys), HTTPS, rate limiting, and never expose RTSP credentials in client-side logs.
+
 ## Roadmap / TODO
 
 - [ ] Harden `omni-object` (YOLO pipeline, publishing to Redis)  
@@ -114,7 +124,8 @@ Browsers do not play raw RTSP; use **HLS** or **WebRTC** via a relay such as **M
 
 ## Remote repository
 
-Upstream template or mirror: [github.com/thtcsec/Project-OmniVision](https://github.com/thtcsec/Project-OmniVision) (set `git remote add origin` if you maintain a fork).
+Primary repo: [github.com/thtcsec/Project-OmniVisionX](https://github.com/thtcsec/Project-OmniVisionX) — update remote if needed:  
+`git remote set-url origin https://github.com/thtcsec/Project-OmniVisionX.git`
 
 ## Hackathon
 

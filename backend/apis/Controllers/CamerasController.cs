@@ -23,32 +23,70 @@ public class CamerasController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Camera>>> GetCameras()
     {
-        var cameras = _db.Cameras.ToList();
-        return Ok(cameras);
+        return Ok(await _db.Cameras.AsNoTracking().ToListAsync());
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<Camera>> GetCamera(string id)
     {
-        var camera = await _db.Cameras.FindAsync(id);
+        var camera = await _db.Cameras.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
         if (camera == null) return NotFound();
         return Ok(camera);
     }
 
     [HttpPost]
-    public async Task<ActionResult<Camera>> CreateCamera([FromBody] Camera camera)
+    public async Task<ActionResult<Camera>> CreateCamera([FromBody] CameraWriteDto dto)
     {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        var urlErr = ValidateStreamUrl(dto.StreamUrl);
+        if (urlErr != null)
+            return BadRequest(new { error = urlErr });
+
+        var camera = new Camera
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = dto.Name.Trim(),
+            StreamUrl = dto.StreamUrl.Trim(),
+            Status = dto.Status is "online" or "offline" ? dto.Status : "offline",
+            EnableObjectDetection = dto.EnableObjectDetection,
+            EnablePlateOcr = dto.EnablePlateOcr,
+            EnableFaceRecognition = dto.EnableFaceRecognition,
+        };
+
         _db.Cameras.Add(camera);
         await _db.SaveChangesAsync();
+
+        await _hub.Clients.Group("omni-all").SendAsync("CamerasChanged", new { action = "created", id = camera.Id });
+
         return CreatedAtAction(nameof(GetCamera), new { id = camera.Id }, camera);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateCamera(string id, [FromBody] Camera camera)
+    public async Task<IActionResult> UpdateCamera(string id, [FromBody] CameraWriteDto dto)
     {
-        if (id != camera.Id) return BadRequest();
-        _db.Entry(camera).State = EntityState.Modified;
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        var urlErr = ValidateStreamUrl(dto.StreamUrl);
+        if (urlErr != null)
+            return BadRequest(new { error = urlErr });
+
+        var camera = await _db.Cameras.FindAsync(id);
+        if (camera == null) return NotFound();
+
+        camera.Name = dto.Name.Trim();
+        camera.StreamUrl = dto.StreamUrl.Trim();
+        camera.Status = dto.Status is "online" or "offline" ? dto.Status : camera.Status;
+        camera.EnableObjectDetection = dto.EnableObjectDetection;
+        camera.EnablePlateOcr = dto.EnablePlateOcr;
+        camera.EnableFaceRecognition = dto.EnableFaceRecognition;
+
         await _db.SaveChangesAsync();
+
+        await _hub.Clients.Group("omni-all").SendAsync("CamerasChanged", new { action = "updated", id });
+
         return NoContent();
     }
 
@@ -57,15 +95,18 @@ public class CamerasController : ControllerBase
     {
         var camera = await _db.Cameras.FindAsync(id);
         if (camera == null) return NotFound();
+
         _db.Cameras.Remove(camera);
         await _db.SaveChangesAsync();
+
+        await _hub.Clients.Group("omni-all").SendAsync("CamerasChanged", new { action = "deleted", id });
+
         return NoContent();
     }
 
     [HttpGet("{id}/stats")]
     public ActionResult<CameraStats> GetCameraStats(string id)
     {
-        // TODO: Get stats from Redis
         return Ok(new CameraStats
         {
             CameraId = id,
@@ -79,8 +120,21 @@ public class CamerasController : ControllerBase
     [HttpPost("{id}/subscribe")]
     public IActionResult SubscribeToCamera(string id)
     {
-        // SignalR group management must be handled directly via Hub connection from the client side.
-        // A client connects to the hub and calls the Hub's Subscribe method with the camera ID instead.
         return Ok(new { message = $"Use SignalR Hub to subscribe to camera {id}." });
+    }
+
+    private static string? ValidateStreamUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return null;
+        var u = url.Trim();
+        if (u.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase)
+            || u.StartsWith("rtsps://", StringComparison.OrdinalIgnoreCase))
+            return null;
+        // Cho phép http(s) cho HLS preview sau này
+        if (u.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || u.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return null;
+        return "Stream URL must be rtsp(s):// or http(s)://";
     }
 }
