@@ -9,7 +9,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -23,18 +22,12 @@ export type CameraFormValues = {
   name: string;
   streamUrl: string;
   status: "online" | "offline";
-  enableObjectDetection: boolean;
-  enablePlateOcr: boolean;
-  enableFaceRecognition: boolean;
 };
 
 const emptyForm: CameraFormValues = {
   name: "",
   streamUrl: "",
-  status: "offline",
-  enableObjectDetection: true,
-  enablePlateOcr: false,
-  enableFaceRecognition: false,
+  status: "online",
 };
 
 function cameraToForm(cam: Camera): CameraFormValues {
@@ -42,9 +35,6 @@ function cameraToForm(cam: Camera): CameraFormValues {
     name: cam.name,
     streamUrl: cam.streamUrl ?? "",
     status: cam.status,
-    enableObjectDetection: cam.features.objectDetection ?? false,
-    enablePlateOcr: cam.features.plateRecognition ?? false,
-    enableFaceRecognition: cam.features.faceDetection ?? false,
   };
 }
 
@@ -121,36 +111,6 @@ export function CameraFormDialog({
                   <SelectItem value="online">Online</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <Label htmlFor="f-obj" className="cursor-pointer">
-                Object detection
-              </Label>
-              <Switch
-                id="f-obj"
-                checked={form.enableObjectDetection}
-                onCheckedChange={(v) => setForm((f) => ({ ...f, enableObjectDetection: v }))}
-              />
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <Label htmlFor="f-plate" className="cursor-pointer">
-                Plate OCR
-              </Label>
-              <Switch
-                id="f-plate"
-                checked={form.enablePlateOcr}
-                onCheckedChange={(v) => setForm((f) => ({ ...f, enablePlateOcr: v }))}
-              />
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <Label htmlFor="f-face" className="cursor-pointer">
-                Face recognition
-              </Label>
-              <Switch
-                id="f-face"
-                checked={form.enableFaceRecognition}
-                onCheckedChange={(v) => setForm((f) => ({ ...f, enableFaceRecognition: v }))}
-              />
             </div>
           </div>
           <DialogFooter>

@@ -106,17 +106,14 @@ function cameraToApiBody(values: {
   name: string;
   streamUrl: string;
   status: "online" | "offline";
-  enableObjectDetection: boolean;
-  enablePlateOcr: boolean;
-  enableFaceRecognition: boolean;
 }) {
   return {
     name: values.name,
     streamUrl: values.streamUrl,
     status: values.status,
-    enableObjectDetection: values.enableObjectDetection,
-    enablePlateOcr: values.enablePlateOcr,
-    enableFaceRecognition: values.enableFaceRecognition,
+    enableObjectDetection: true,
+    enablePlateOcr: true,
+    enableFaceRecognition: false,
   };
 }
 
