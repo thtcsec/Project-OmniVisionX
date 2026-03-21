@@ -27,8 +27,10 @@ import {
 import { Camera, Eye, Pencil, Plus, ScanLine, Trash2, User } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import type { Camera as CameraType } from "@/types/omni";
+import { useI18n } from "@/i18n/I18nProvider";
 
 export default function CameraList() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<CameraType | null>(null);
@@ -86,9 +88,7 @@ export default function CameraList() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Cameras</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            CRUD cameras (hackathon — no login). Production should add JWT / API keys.
-          </p>
+          <p className="text-muted-foreground text-sm mt-1">{t("cameras.hackathonNote")}</p>
         </div>
         <Button onClick={() => setCreateOpen(true)} className="shrink-0">
           <Plus className="h-4 w-4 mr-2" />

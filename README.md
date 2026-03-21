@@ -112,6 +112,10 @@ Browsers do not play raw RTSP; use **HLS** or **WebRTC** via a relay such as **M
 The web UI under **Cameras** supports **create / read / update / delete** via `GET|POST|PUT|DELETE /api/Cameras`.  
 Stream URL accepts **rtsp(s)://** or **http(s)://** (e.g. HLS later). After mutations, clients subscribed to SignalR receive **`CamerasChanged`** so lists refresh across tabs.
 
+## Live preview (`/live`)
+
+Spa route **Live preview** plays the camera HLS/WebRTC URL (same convention as camera detail + `OMNI_MEDIA_BASE_URL`) and optionally draws **bounding boxes** from **`OmniEvent`** (Redis → `OmniEventConsumerService` → SignalR). Toggle **Show tracking overlays** to enable/disable. UI supports **English / Vietnamese** and persists locale in `localStorage` (`omnivisionx-locale`).
+
 ## Security note (hackathon vs production)
 
 **Hackathon build:** API and CRUD are **open** (no JWT / roles) so judges can try flows quickly.  

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { LayoutDashboard, Camera, Play, Search, Info, Settings } from "lucide-react";
+import { LayoutDashboard, Camera, Play, Search, Info, Settings, Radio } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { SettingsDialog } from "@/components/SettingsDialog";
+import { useI18n } from "@/i18n/I18nProvider";
 import {
   Sidebar,
   SidebarContent,
@@ -20,14 +21,16 @@ import {
 
 const LOGO = "/branding/project-omnivisionx.png";
 
-const navItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Cameras", url: "/cameras", icon: Camera },
-  { title: "Plate Search", url: "/plates", icon: Search },
-  { title: "Simulator", url: "/simulator", icon: Play },
-];
+const navConfig = [
+  { titleKey: "nav.dashboard" as const, url: "/", icon: LayoutDashboard },
+  { titleKey: "nav.cameras" as const, url: "/cameras", icon: Camera },
+  { titleKey: "nav.live" as const, url: "/live", icon: Radio },
+  { titleKey: "nav.plates" as const, url: "/plates", icon: Search },
+  { titleKey: "nav.simulator" as const, url: "/simulator", icon: Play },
+] as const;
 
 export function AppSidebar() {
+  const { t } = useI18n();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
@@ -46,7 +49,7 @@ export function AppSidebar() {
               />
               <div className="min-w-0">
                 <h1 className="text-sm font-semibold text-sidebar-foreground truncate">OmniVisionX</h1>
-                <p className="text-[10px] text-muted-foreground">Traffic Analytics</p>
+                <p className="text-[10px] text-muted-foreground">{t("nav.subtitle")}</p>
               </div>
             </div>
           )}
@@ -62,24 +65,30 @@ export function AppSidebar() {
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+            <SidebarGroupLabel>{t("nav.group")}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {navItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={location.pathname === item.url || (item.url !== "/" && location.pathname.startsWith(item.url))} tooltip={item.title}>
-                      <NavLink
-                        to={item.url}
-                        end={item.url === "/"}
-                        className="hover:bg-sidebar-accent/50"
-                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                      >
-                        <item.icon className="h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {navConfig.map((item) => {
+                  const title = t(item.titleKey);
+                  const isActive =
+                    location.pathname === item.url ||
+                    (item.url !== "/" && location.pathname.startsWith(item.url));
+                  return (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton asChild isActive={isActive} tooltip={title}>
+                        <NavLink
+                          to={item.url}
+                          end={item.url === "/"}
+                          className="hover:bg-sidebar-accent/50"
+                          activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        >
+                          <item.icon className="h-4 w-4" />
+                          {!collapsed && <span>{title}</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -93,7 +102,7 @@ export function AppSidebar() {
               <SidebarMenuButton
                 asChild
                 isActive={location.pathname === "/about"}
-                tooltip="Giới thiệu"
+                tooltip={t("nav.about")}
               >
                 <NavLink
                   to="/about"
@@ -101,7 +110,7 @@ export function AppSidebar() {
                   activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                 >
                   <Info className="h-4 w-4" />
-                  {!collapsed && <span>About</span>}
+                  {!collapsed && <span>{t("nav.about")}</span>}
                 </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -109,10 +118,10 @@ export function AppSidebar() {
               <SidebarMenuButton
                 type="button"
                 onClick={() => setSettingsOpen(true)}
-                tooltip="Cài đặt"
+                tooltip={t("nav.settings")}
               >
                 <Settings className="h-4 w-4" />
-                {!collapsed && <span>Settings</span>}
+                {!collapsed && <span>{t("nav.settings")}</span>}
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
