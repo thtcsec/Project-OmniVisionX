@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCameraStream } from "@/hooks/useCameraStream";
 import { mapBboxToObjectContainPercent } from "@/lib/bboxOverlay";
+import { OVERLAY_TRACK_TTL_MS } from "@/lib/overlayConstants";
 import type { TrackOverlay } from "@/lib/parseOmniBbox";
 import { Video, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/I18nProvider";
 
-const STALE_MS = 600;
 
 interface LiveStreamPlayerProps {
   hlsUrl?: string;
@@ -56,13 +56,27 @@ export function LiveStreamPlayer({
   }, [measure, videoRef, hlsUrl, webrtcUrl]);
 
   const now = Date.now();
-  const fresh = tracks.filter((t) => now - t.lastSeen < STALE_MS);
+  const fresh = tracks.filter((t) => now - t.lastSeen < OVERLAY_TRACK_TTL_MS);
+  const visible = fresh
+    .filter((t) => {
+      // Only drop detections that are clearly stale (>3s old source timestamp)
+      // 1200ms was too strict — caused bbox to flicker/disappear on slow pipelines
+      const sourceTs = (t as unknown as { sourceTs?: number }).sourceTs;
+      if (typeof sourceTs === "number" && Number.isFinite(sourceTs)) {
+        const ageMs = now - sourceTs;
+        if (ageMs > 3000) return false;
+      }
+      return true;
+    })
+    .filter((t) => (Number.isFinite(t.confidence) ? t.confidence >= 0.20 : true))
+    .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+    .slice(0, 40);
 
   const colors: Record<string, string> = {
-    detection: "rgba(59, 130, 246, 0.85)",
-    vehicle: "rgba(34, 197, 94, 0.85)",
-    plate: "rgba(239, 68, 68, 0.9)",
-    human: "rgba(168, 85, 247, 0.85)",
+    detection: "#3b82f6",
+    vehicle: "#22c55e",
+    plate: "#ef4444",
+    human: "#a855f7",
   };
 
   return (
@@ -78,14 +92,14 @@ export function LiveStreamPlayer({
         className="w-full h-full object-contain"
       />
 
-      {showOverlays && fresh.length > 0 && dims.cw > 0 && (
+      {showOverlays && visible.length > 0 && dims.cw > 0 && (
         <svg
           className="absolute inset-0 w-full h-full pointer-events-none"
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
           aria-hidden
         >
-          {fresh.map((t) => {
+          {visible.map((t) => {
             const m = mapBboxToObjectContainPercent(
               t.x1,
               t.y1,
@@ -98,6 +112,7 @@ export function LiveStreamPlayer({
             );
             if (!m) return null;
             const stroke = colors[t.kind] ?? colors.detection;
+            const label = t.label.length > 18 ? `${t.label.slice(0, 18)}…` : t.label;
             return (
               <g key={t.id}>
                 <rect
@@ -107,17 +122,23 @@ export function LiveStreamPlayer({
                   height={m.h}
                   fill="none"
                   stroke={stroke}
-                  strokeWidth={0.35}
+                  strokeWidth={2}
                   vectorEffect="non-scaling-stroke"
+                  shapeRendering="crispEdges"
+                  strokeLinejoin="round"
                 />
                 <text
-                  x={m.x + 0.2}
-                  y={Math.max(m.y - 0.4, 1)}
-                  fill={stroke}
-                  fontSize={2.2}
+                  x={m.x + 0.6}
+                  y={Math.max(m.y + 2.2, 2.2)}
+                  fill="#ffffff"
+                  stroke="rgba(0,0,0,0.75)"
+                  strokeWidth={2.6}
+                  vectorEffect="non-scaling-stroke"
+                  paintOrder="stroke"
+                  fontSize={2.1}
                   className="font-mono"
                 >
-                  {t.label.length > 18 ? `${t.label.slice(0, 18)}…` : t.label}
+                  {label}
                 </text>
               </g>
             );

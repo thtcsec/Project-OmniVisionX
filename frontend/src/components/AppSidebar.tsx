@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LayoutDashboard, Camera, Play, Search, Info, Settings, Radio } from "lucide-react";
+import { LayoutDashboard, Camera, Play, Activity, Info, Settings, Radio } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { SettingsDialog } from "@/components/SettingsDialog";
@@ -25,7 +25,7 @@ const navConfig = [
   { titleKey: "nav.dashboard" as const, url: "/", icon: LayoutDashboard },
   { titleKey: "nav.cameras" as const, url: "/cameras", icon: Camera },
   { titleKey: "nav.live" as const, url: "/live", icon: Radio },
-  { titleKey: "nav.plates" as const, url: "/plates", icon: Search },
+  { titleKey: "nav.plates" as const, url: "/plates", icon: Activity },
   { titleKey: "nav.simulator" as const, url: "/simulator", icon: Play },
 ] as const;
 

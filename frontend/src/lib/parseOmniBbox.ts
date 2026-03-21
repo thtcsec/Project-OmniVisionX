@@ -12,14 +12,44 @@ export type TrackOverlay = {
   kind: OmniEvent["type"];
 };
 
+/** Parse hub `data` whether it arrives as JSON string or pre-parsed object. */
+export function parseOmniEventPayload(data: OmniEvent["data"]): Record<string, unknown> | null {
+  if (data == null) return null;
+  if (typeof data === "string") {
+    try {
+      return JSON.parse(data) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof data === "object" && !Array.isArray(data)) {
+    return data as Record<string, unknown>;
+  }
+  return null;
+}
+
+function parseBboxParts(d: Record<string, unknown>): [number, number, number, number] | null {
+  const raw = d.bbox;
+  if (typeof raw === "string") {
+    const parts = raw.split(",").map((x) => parseFloat(x.trim()));
+    if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) return null;
+    return [parts[0], parts[1], parts[2], parts[3]];
+  }
+  if (Array.isArray(raw) && raw.length === 4) {
+    const parts = raw.map((x) => (typeof x === "number" ? x : parseFloat(String(x))));
+    if (parts.some((n) => Number.isNaN(n))) return null;
+    return [parts[0], parts[1], parts[2], parts[3]];
+  }
+  return null;
+}
+
 export function parseBboxFromOmniEvent(event: OmniEvent): Omit<TrackOverlay, "lastSeen"> | null {
   try {
-    const d = JSON.parse(event.data) as Record<string, unknown>;
-    const bboxStr = d.bbox;
-    if (typeof bboxStr !== "string") return null;
-    const parts = bboxStr.split(",").map((x) => parseFloat(x.trim()));
-    if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) return null;
-    const [x1, y1, x2, y2] = parts;
+    const d = parseOmniEventPayload(event.data);
+    if (!d) return null;
+    const coords = parseBboxParts(d);
+    if (!coords) return null;
+    const [x1, y1, x2, y2] = coords;
     const id = String(
       d.globalTrackId ?? d.track_id ?? `${event.type}-${event.timestamp}-${d.label ?? "obj"}`,
     );
