@@ -78,6 +78,23 @@ services:
       - Simulator__ApiBaseUrl=http://omni-simulator:8554
       - EnvEditor__Enabled=${OMNI_ENV_EDITOR_ENABLED:-true}
       - EnvEditor__EnvFilePath=/app/.env
+      - OmniObject__BaseUrl=http://omni-object:8555
+      - Omni__RedisStreamPrefix=${OMNI_REDIS_STREAM_PREFIX:-omni}
+      - OMNI_OPENAI_API_KEY=${OMNI_OPENAI_API_KEY:-}
+      - OMNI_OPENAI_MODEL_ID=${OMNI_OPENAI_MODEL_ID:-}
+      - OMNI_QWEN_API_KEY=${OMNI_QWEN_API_KEY:-}
+      - OMNI_QWEN_BASE_URL=${OMNI_QWEN_BASE_URL:-}
+      - OMNI_QWEN_MODEL_ID=${OMNI_QWEN_MODEL_ID:-}
+      - OMNI_ELEVENLABS_API_KEY=${OMNI_ELEVENLABS_API_KEY:-}
+      - OMNI_ELEVENLABS_VOICE_ID=${OMNI_ELEVENLABS_VOICE_ID:-21m00Tcm4TlvDq8ikWAM}
+      - OMNI_ELEVENLABS_MODEL_ID=${OMNI_ELEVENLABS_MODEL_ID:-eleven_multilingual_v2}
+      - OMNI_EXA_API_KEY=${OMNI_EXA_API_KEY:-}
+      - OMNI_DIFY_API_KEY=${OMNI_DIFY_API_KEY:-}
+      - OMNI_VALSEA_API_KEY=${OMNI_VALSEA_API_KEY:-}
+      - OMNI_AGORA_APP_ID=${OMNI_AGORA_APP_ID:-}
+      - OMNI_AGORA_APP_CERTIFICATE=${OMNI_AGORA_APP_CERTIFICATE:-}
+    volumes:
+      - ./.env:/app/.env:rw
     depends_on:
       omni-db:
         condition: service_healthy
@@ -127,6 +144,11 @@ services:
       - REDIS_URL=redis://omni-bus:6379
       - DEVICE=cuda:0
       - DATABASE_URL=postgresql+asyncpg://postgres:admin@omni-db:5432/omnivision
+      - CAPTURE_FPS=6
+      - FRAME_RATE=6
+      - MAX_CONCURRENT_INFERENCE=2
+      - BATCH_INFERENCE_SIZE=2
+      - CAPTURE_BUFFER_SIZE=6
     volumes:
       - ./data/weights:/app/weights
       - ./data/shm:/app/shm
@@ -161,8 +183,23 @@ services:
     environment:
       - REDIS_URL=redis://omni-bus:6379
       - DEVICE=cuda:0
+      - DATABASE_URL=postgresql+asyncpg://postgres:admin@omni-db:5432/omnivision
+      - S3_ENABLED=true
+      - S3_INTERNAL_ENDPOINT=omni-minio:9000
+      - S3_PUBLIC_ENDPOINT=localhost:9000
+      - S3_ACCESS_KEY=${MINIO_ROOT_USER:-admin}
+      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD:-change_this_minio_secret}
+      - S3_BUCKET=events
+      - S3_SECURE=false
+      - ENABLE_PADDLEOCR=true
+      - OCR_PROVIDER=paddle
+      - SNAPSHOT_INTERVAL=3
+      - LPR_SCHEDULER_ENABLED=1
+      - ENABLE_FORTRESS_LPR=false
+      - LPR_CAMERA_ALLOWLIST=51c6dfdf09de4de9866043d4684c88fe,d61bfb5a88a14b159b6c91439f23b2ad
     volumes:
       - ./data/weights:/app/weights
+      - ./data/shm:/app/shm
       - ./data/thumbnails:/app/thumbnails
     deploy:
       resources:

@@ -145,6 +145,32 @@ export const deleteCamera = (id: string) =>
     method: "DELETE",
   });
 
+/** Proxied from omni-object via omni-api — works when Redis→SignalR is broken. */
+export type LatestDetectionsSnapshot = {
+  items: Record<
+    string,
+    {
+      timestamp?: number;
+      frame_width?: number;
+      frame_height?: number;
+      detections?: Array<{
+        track_id: number;
+        class_name?: string;
+        class?: string;
+        confidence?: number;
+        bbox: [number, number, number, number];
+      }>;
+    }
+  >;
+  error?: string;
+  detail?: string;
+};
+
+export const fetchLatestDetectionsSnapshot = (cameraIds: string) =>
+  request<LatestDetectionsSnapshot>(
+    `${API_BASE}/api/live/detections/latest?cameraIds=${encodeURIComponent(cameraIds)}`,
+  );
+
 // Detections
 export const fetchDetections = (params?: { cameraId?: string; from?: string; to?: string }) => {
   const q = new URLSearchParams();
@@ -156,8 +182,10 @@ export const fetchDetections = (params?: { cameraId?: string; from?: string; to?
 
 // Plates
 export const fetchPlates = (search?: string) => {
-  const q = search ? `?search=${encodeURIComponent(search)}` : "";
-  return request<PlateResult[]>(`${API_BASE}/api/Plates${q}`);
+  const q = new URLSearchParams();
+  if (search) q.set("plateText", search);
+  const qs = q.toString();
+  return request<PlateResult[]>(`${API_BASE}/api/Plates${qs ? `?${qs}` : ""}`);
 };
 
 // Dashboard stats
@@ -177,8 +205,8 @@ export const startSimulatorCamera = (cameraId: string, videoPath: string) =>
     body: JSON.stringify({
       video_path: videoPath,
       loop: true,
-      fps: 30,
-      transcode_h264: true,
+      fps: 15,
+      transcode_h264: false,
     }),
   });
 export const stopSimulatorCamera = (id: string) =>
@@ -201,3 +229,48 @@ export const updateIntegrationEnvVars = (updates: Array<{ key: string; value: st
     method: "PUT",
     body: JSON.stringify({ updates }),
   });
+
+export type IntegrationsStatus = {
+  agora: { configured: boolean };
+  elevenlabs: { configured: boolean };
+  valsea: { configured: boolean };
+  openai: { configured: boolean };
+  exa: { configured: boolean };
+  qwen: { configured: boolean };
+  dify: { configured: boolean };
+};
+
+export const fetchIntegrationsStatus = () => request<IntegrationsStatus>(`${API_BASE}/api/integrations/status`);
+
+export const chatWithCamera = (payload: { message: string; cameraId?: string }) =>
+  request<{ provider: string; model: string; reply: string }>(`${API_BASE}/api/integrations/chat`, {
+    method: "POST",
+    body: JSON.stringify({ message: payload.message, cameraId: payload.cameraId }),
+  });
+
+export const speakText = (payload: { text: string; voiceId?: string; modelId?: string }) =>
+  fetch(`${API_BASE}/api/integrations/tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(async (r) => {
+    if (!r.ok) throw new Error(await r.text());
+    return r.blob();
+  });
+
+export type AgoraTokenResult = {
+  token: string;
+  appId: string;
+  channel: string;
+  uid: number;
+  expireSeconds: number;
+};
+
+export const fetchAgoraToken = (channelName: string, uid = 0, role: "subscriber" | "publisher" = "subscriber") =>
+  request<AgoraTokenResult>(`${API_BASE}/api/agora/token`, {
+    method: "POST",
+    body: JSON.stringify({ channelName, uid, role, expireSeconds: 3600 }),
+  });
+
+export const fetchAgoraStatus = () =>
+  request<{ configured: boolean; appId: string | null }>(`${API_BASE}/api/agora/status`);

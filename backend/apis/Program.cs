@@ -18,6 +18,13 @@ builder.Services.AddDbContext<OmniDbContext>(options =>
 // Add Redis
 builder.Services.AddSingleton<RedisService>();
 
+// Shared .env file reader — used by integration controllers to pick up
+// values saved at runtime via the Settings UI without container restart.
+builder.Services.AddSingleton<EnvFileReader>();
+
+// HTTP client for proxying to omni-object (live detection overlays)
+builder.Services.AddHttpClient();
+
 // MediaMTX — register camera paths for browser HLS/WebRTC (path name = camera Id)
 builder.Services.AddHttpClient<MediaMtxPathRegistrar>(client =>
 {

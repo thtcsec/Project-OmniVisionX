@@ -8,19 +8,21 @@ public sealed class IntegrationsEnvController : ControllerBase
 {
     private static readonly EnvVarSpec[] Specs =
     [
-        new("Agora", "Agora App ID", "AGORA_APP_ID", false),
-        new("Agora", "Agora App Certificate", "AGORA_APP_CERTIFICATE", true),
-        new("ElevenLabs", "ElevenLabs API Key", "ELEVEN_API_KEY", true),
-        new("ElevenLabs", "ElevenLabs Voice ID", "ELEVEN_VOICE_ID", false),
-        new("Valsea", "Valsea API Key", "VALSEA_API_KEY", true),
-        new("Valsea", "Valsea Org ID", "VALSEA_ORG_ID", false),
-        new("OpenAI", "OpenAI API Key", "OPENAI_API_KEY", true),
-        new("OpenAI", "OpenAI Model ID", "OPENAI_MODEL_ID", false),
-        new("Exa AI", "Exa API Key", "EXA_API_KEY", true),
-        new("Qwen", "Qwen API Key", "QWEN_API_KEY", true),
-        new("Qwen", "Qwen Base URL", "QWEN_BASE_URL", false),
-        new("Dify", "Dify API Key", "DIFY_API_KEY", true),
-        new("Dify", "Dify App ID", "DIFY_APP_ID", false),
+        new("Agora", "App ID",          "OMNI_AGORA_APP_ID",          false),
+        new("Agora", "App Certificate", "OMNI_AGORA_APP_CERTIFICATE",  true),
+        new("ElevenLabs", "API Key",    "OMNI_ELEVENLABS_API_KEY",     true),
+        new("ElevenLabs", "Voice ID",   "OMNI_ELEVENLABS_VOICE_ID",    false),
+        new("ElevenLabs", "Model ID",   "OMNI_ELEVENLABS_MODEL_ID",    false),
+        new("OpenAI", "API Key",        "OMNI_OPENAI_API_KEY",         true),
+        new("OpenAI", "Model ID",       "OMNI_OPENAI_MODEL_ID",        false),
+        new("Qwen", "API Key",          "OMNI_QWEN_API_KEY",           true),
+        new("Qwen", "Base URL",         "OMNI_QWEN_BASE_URL",          false),
+        new("Qwen", "Model ID",         "OMNI_QWEN_MODEL_ID",          false),
+        new("Exa AI", "API Key",        "OMNI_EXA_API_KEY",            true),
+        new("Dify", "API Key",          "OMNI_DIFY_API_KEY",           true),
+        new("Dify", "App ID",           "OMNI_DIFY_APP_ID",            false),
+        new("Valsea", "API Key",        "OMNI_VALSEA_API_KEY",         true),
+        new("Valsea", "Org ID",         "OMNI_VALSEA_ORG_ID",          false),
     ];
 
     private readonly IConfiguration _configuration;
@@ -30,8 +32,24 @@ public sealed class IntegrationsEnvController : ControllerBase
         _configuration = configuration;
     }
 
-    private bool Enabled => string.Equals(_configuration["EnvEditor:Enabled"], "true", StringComparison.OrdinalIgnoreCase);
-    private string EnvFilePath => _configuration["EnvEditor:EnvFilePath"] ?? "/app/.env";
+    private bool Enabled
+    {
+        get
+        {
+            // Check env var first (docker-compose passes OMNI_ENV_EDITOR_ENABLED=true)
+            var fromEnv = Environment.GetEnvironmentVariable("OMNI_ENV_EDITOR_ENABLED");
+            if (!string.IsNullOrWhiteSpace(fromEnv))
+                return string.Equals(fromEnv, "true", StringComparison.OrdinalIgnoreCase);
+            // Fallback to appsettings / compose-injected config key
+            var fromCfg = _configuration["EnvEditor:Enabled"] ?? _configuration["EnvEditor__Enabled"];
+            return string.Equals(fromCfg, "true", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private string EnvFilePath =>
+        _configuration["EnvEditor:EnvFilePath"]
+        ?? _configuration["EnvEditor__EnvFilePath"]
+        ?? "/app/.env";
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<EnvVarDto>>> Get(CancellationToken ct)
