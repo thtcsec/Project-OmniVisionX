@@ -6,11 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import type { PlateResult } from "@/types/omni";
 import { Search, Download } from "lucide-react";
 
 export default function PlateSearch() {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<PlateResult | null>(null);
 
   const { data: plates, isLoading, isError } = useQuery({
     queryKey: ["plates", search],
@@ -72,17 +75,32 @@ export default function PlateSearch() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Images</TableHead>
                   <TableHead>Plate</TableHead>
                   <TableHead>Camera</TableHead>
+                  <TableHead>Vehicle</TableHead>
                   <TableHead>Confidence</TableHead>
                   <TableHead>Timestamp</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {plates.map((p) => (
-                  <TableRow key={p.id}>
+                  <TableRow key={p.id} className="cursor-pointer" onClick={() => setSelected(p)}>
+                    <TableCell className="py-2">
+                      {p.plateImageUrl ? (
+                        <img
+                          src={p.plateImageUrl}
+                          alt={p.plateText}
+                          className="h-10 w-24 object-cover rounded border bg-muted"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="h-10 w-24 rounded border bg-muted" />
+                      )}
+                    </TableCell>
                     <TableCell className="font-mono font-semibold">{p.plateText}</TableCell>
                     <TableCell>{p.cameraName ?? p.cameraId}</TableCell>
+                    <TableCell className="text-xs">{p.vehicleType ?? "unknown"}</TableCell>
                     <TableCell>{(p.confidence * 100).toFixed(1)}%</TableCell>
                     <TableCell className="font-mono text-xs">{new Date(p.timestamp).toLocaleString()}</TableCell>
                   </TableRow>
@@ -92,6 +110,44 @@ export default function PlateSearch() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="font-mono">{selected?.plateText}</DialogTitle>
+          </DialogHeader>
+          {selected && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Plate crop</p>
+                {selected.plateImageUrl ? (
+                  <img
+                    src={selected.plateImageUrl}
+                    alt={`${selected.plateText} plate`}
+                    className="w-full rounded border bg-muted"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="h-40 rounded border bg-muted" />
+                )}
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Full frame</p>
+                {selected.frameImageUrl ? (
+                  <img
+                    src={selected.frameImageUrl}
+                    alt={`${selected.plateText} frame`}
+                    className="w-full rounded border bg-muted"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="h-40 rounded border bg-muted" />
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

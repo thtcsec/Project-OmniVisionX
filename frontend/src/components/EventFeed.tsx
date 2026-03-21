@@ -1,4 +1,5 @@
 import type { OmniEvent } from "@/types/omni";
+import { parseOmniEventPayload } from "@/lib/parseOmniBbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Car, User, ScanLine, Eye } from "lucide-react";
@@ -38,13 +39,15 @@ export function EventFeed({ events, maxHeight = "400px" }: EventFeedProps) {
           const Icon = typeIcons[event.type] ?? Eye;
           const colorClass = typeColors[event.type] ?? typeColors.detection;
           const time = new Date(event.timestamp).toLocaleTimeString();
-          let summary = "";
-          try {
-            const d = JSON.parse(event.data);
-            summary = d.label ?? d.plateText ?? d.type ?? event.type;
-          } catch {
-            summary = event.type;
-          }
+          const payload = parseOmniEventPayload(event.data);
+          const summary = payload
+            ? String(
+                (payload.label as string | undefined) ??
+                  (payload.plateText as string | undefined) ??
+                  (payload.type as string | undefined) ??
+                  event.type,
+              )
+            : event.type;
 
           return (
             <div key={`${event.timestamp}-${i}`} className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors">

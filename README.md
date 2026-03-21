@@ -114,7 +114,7 @@ Stream URL accepts **rtsp(s)://** or **http(s)://** (e.g. HLS later). After muta
 
 ## Live preview (`/live`)
 
-Spa route **Live preview** plays the camera HLS/WebRTC URL (same convention as camera detail + `OMNI_MEDIA_BASE_URL`) and optionally draws **bounding boxes** from **`OmniEvent`** (Redis → `OmniEventConsumerService` → SignalR). Toggle **Show tracking overlays** to enable/disable. UI supports **English / Vietnamese** and persists locale in `localStorage` (`omnivisionx-locale`).
+Spa route **Live preview** plays the camera HLS/WebRTC URL (same convention as camera detail + `OMNI_MEDIA_BASE_URL`) and draws **bounding boxes** from (1) **SignalR** `OmniEvent` (Redis → `OmniEventConsumerService`) and (2) **HTTP snapshot** proxied from omni-object (`GET /api/live/detections/latest`) so overlays still work when the Redis/SignalR path is misconfigured. Toggle **Show tracking overlays** to enable/disable. See **`docs/OVERLAY-PIPELINE.md`** for a full checklist. UI supports **English / Vietnamese** and persists locale in `localStorage` (`omnivisionx-locale`).
 
 **If you see “Stream unavailable” / `ERR_CONNECTION_REFUSED` on ports 8888 or 8889:** the UI defaults to HLS `http://localhost:8888/<cameraId>/index.m3u8` and WHEP `http://localhost:8889/<cameraId>/whep` (MediaMTX). Start the relay:
 

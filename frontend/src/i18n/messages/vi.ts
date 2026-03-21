@@ -78,7 +78,8 @@ export const vi: MessageTree = {
     pageIndicator: "Trang {page} / {total}",
     chatTitle: "Chat với Camera",
     chatHint: "Hỏi nhanh về cảnh hiện tại (OpenAI/Qwen).",
-    chatNeedConfig: "Chưa cấu hình LLM. Vào Cài đặt → Tích hợp để nhập key OpenAI hoặc Qwen.",
+    chatNeedConfig:
+      "Chưa cấu hình LLM. Vào Cài đặt → Tích hợp để nhập Dify, OpenAI hoặc Qwen.",
     chatEmpty: "Chưa có tin nhắn.",
     chatYou: "Bạn",
     chatAssistant: "Trợ lý",

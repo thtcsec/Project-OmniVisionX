@@ -146,7 +146,11 @@ export default function LivePreview() {
     retry: false,
   });
 
-  const llmConfigured = !!(integrationsQuery.data?.openai.configured || integrationsQuery.data?.qwen.configured);
+  const llmConfigured = !!(
+    integrationsQuery.data?.dify.configured ||
+    integrationsQuery.data?.openai.configured ||
+    integrationsQuery.data?.qwen.configured
+  );
   const ttsConfigured = !!integrationsQuery.data?.elevenlabs.configured;
   const agoraConfigured = !!agoraStatusQuery.data?.configured;
 

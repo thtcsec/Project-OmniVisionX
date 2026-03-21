@@ -242,11 +242,22 @@ export type IntegrationsStatus = {
 
 export const fetchIntegrationsStatus = () => request<IntegrationsStatus>(`${API_BASE}/api/integrations/status`);
 
-export const chatWithCamera = (payload: { message: string; cameraId?: string }) =>
-  request<{ provider: string; model: string; reply: string }>(`${API_BASE}/api/integrations/chat`, {
-    method: "POST",
-    body: JSON.stringify({ message: payload.message, cameraId: payload.cameraId }),
-  });
+export const chatWithCamera = (payload: {
+  message: string;
+  cameraId?: string;
+  useExaGrounding?: boolean;
+}) =>
+  request<{ provider: string; model: string; reply: string; exaUsed?: boolean }>(
+    `${API_BASE}/api/integrations/chat`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        message: payload.message,
+        cameraId: payload.cameraId,
+        useExaGrounding: payload.useExaGrounding,
+      }),
+    },
+  );
 
 export const speakText = (payload: { text: string; voiceId?: string; modelId?: string }) =>
   fetch(`${API_BASE}/api/integrations/tts`, {

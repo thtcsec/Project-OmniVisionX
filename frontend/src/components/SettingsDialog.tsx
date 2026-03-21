@@ -37,6 +37,7 @@ export function SettingsDialog({ open, onOpenChange }: Props) {
   const [mounted, setMounted] = useState(false);
   const qc = useQueryClient();
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [secretVisible, setSecretVisible] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setMounted(true);

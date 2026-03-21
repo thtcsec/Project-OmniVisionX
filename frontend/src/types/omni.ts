@@ -19,7 +19,8 @@ export interface Camera {
 export interface OmniEvent {
   type: "detection" | "vehicle" | "human" | "plate";
   cameraId: string;
-  data: string; // JSON string — parse by type
+  /** Hub usually sends a JSON string; some transports may deserialize to object. */
+  data: string | Record<string, unknown>;
   timestamp: string;
 }
 
@@ -40,7 +41,10 @@ export interface PlateResult {
   plateText: string;
   confidence: number;
   timestamp: string;
-  imageUrl?: string;
+  vehicleType?: string;
+  color?: string | null;
+  plateImageUrl?: string | null;
+  frameImageUrl?: string | null;
 }
 
 // Simulator types

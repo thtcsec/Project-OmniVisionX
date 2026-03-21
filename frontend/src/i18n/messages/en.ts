@@ -76,7 +76,8 @@ export const en = {
     pageIndicator: "Page {page} of {total}",
     chatTitle: "Chat with Camera",
     chatHint: "Quick questions about the current scene (OpenAI/Qwen).",
-    chatNeedConfig: "No LLM configured. Go to Settings → Integrations and set OpenAI or Qwen keys.",
+    chatNeedConfig:
+      "No LLM configured. Go to Settings → Integrations and set Dify, OpenAI, or Qwen keys.",
     chatEmpty: "No messages yet.",
     chatYou: "You",
     chatAssistant: "Assistant",
