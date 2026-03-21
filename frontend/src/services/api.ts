@@ -4,8 +4,13 @@ const API_BASE = import.meta.env.OMNI_API_BASE_URL ?? "http://localhost:8080";
 const SIM_BASE = import.meta.env.OMNI_SIMULATOR_BASE_URL ?? "http://localhost:8554";
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const hasBody = options?.body !== undefined && options?.body !== null;
+  const defaultHeaders: HeadersInit = hasBody ? { "Content-Type": "application/json" } : {};
   const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      ...defaultHeaders,
+      ...(options?.headers ?? {}),
+    },
     ...options,
   });
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
