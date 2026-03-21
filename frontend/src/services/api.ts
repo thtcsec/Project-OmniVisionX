@@ -17,6 +17,52 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+function simulatorVideosFromResponse(payload: unknown): SimulatorVideo[] {
+  const raw = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object" && Array.isArray((payload as { videos?: unknown[] }).videos)
+      ? (payload as { videos: unknown[] }).videos
+      : [];
+
+  return raw
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+    .map((item) => {
+      const filename = typeof item.filename === "string" ? item.filename : "";
+      const baseName = filename ? filename.replace(/\.[^.]+$/, "") : (typeof item.name === "string" ? item.name : "video");
+      return {
+        id: typeof item.id === "string" ? item.id : filename || baseName,
+        name: typeof item.name === "string" ? item.name : baseName,
+        filename: filename || (typeof item.path === "string" ? item.path.split("/").pop() ?? baseName : baseName),
+        duration: typeof item.duration === "number" ? item.duration : undefined,
+      };
+    });
+}
+
+function simulatorCamerasFromResponse(payload: unknown): SimulatorCamera[] {
+  const raw = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object" && Array.isArray((payload as { cameras?: unknown[] }).cameras)
+      ? (payload as { cameras: unknown[] }).cameras
+      : [];
+
+  return raw
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+    .map((item) => {
+      const id = typeof item.id === "string"
+        ? item.id
+        : typeof item.camera_id === "string"
+          ? item.camera_id
+          : "unknown-camera";
+      const rtspUrl = typeof item.rtspUrl === "string"
+        ? item.rtspUrl
+        : typeof item.rtsp_url === "string"
+          ? item.rtsp_url
+          : "";
+      const status = item.status === "running" ? "running" : "stopped";
+      return { id, rtspUrl, status };
+    });
+}
+
 // Cameras
 export const fetchCameras = () => request<Camera[]>(`${API_BASE}/api/Cameras`);
 export const fetchCamera = (id: string) => request<Camera>(`${API_BASE}/api/Cameras/${id}`);
@@ -40,8 +86,8 @@ export const fetchPlates = (search?: string) => {
 export const fetchDashboardStats = () => request<DashboardStats>(`${API_BASE}/api/Stats/dashboard`);
 
 // Simulator
-export const fetchSimulatorVideos = () => request<SimulatorVideo[]>(`${SIM_BASE}/simulator/videos`);
-export const fetchSimulatorCameras = () => request<SimulatorCamera[]>(`${SIM_BASE}/simulator/cameras`);
+export const fetchSimulatorVideos = async () => simulatorVideosFromResponse(await request<unknown>(`${SIM_BASE}/simulator/videos`));
+export const fetchSimulatorCameras = async () => simulatorCamerasFromResponse(await request<unknown>(`${SIM_BASE}/simulator/cameras`));
 export const startSimulatorCamera = (id: string) =>
   request<SimulatorCamera>(`${SIM_BASE}/simulator/cameras/${id}/start`, { method: "POST" });
 export const stopSimulatorCamera = (id: string) =>
