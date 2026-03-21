@@ -173,3 +173,21 @@ export const startSimulatorCamera = (id: string) =>
   request<SimulatorCamera>(`${SIM_BASE}/simulator/cameras/${id}/start`, { method: "POST" });
 export const stopSimulatorCamera = (id: string) =>
   request<SimulatorCamera>(`${SIM_BASE}/simulator/cameras/${id}/stop`, { method: "POST" });
+
+export type IntegrationEnvVar = {
+  group: string;
+  label: string;
+  key: string;
+  isSecret: boolean;
+  isSet: boolean;
+  value?: string | null;
+};
+
+export const fetchIntegrationEnvVars = () =>
+  request<IntegrationEnvVar[]>(`${API_BASE}/api/settings/integrations/env`);
+
+export const updateIntegrationEnvVars = (updates: Array<{ key: string; value: string }>) =>
+  request<void>(`${API_BASE}/api/settings/integrations/env`, {
+    method: "PUT",
+    body: JSON.stringify({ updates }),
+  });
