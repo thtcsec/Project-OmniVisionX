@@ -101,7 +101,9 @@ services:
     ports:
       - "${SIMULATOR_PORT:-8554}:8554"  # HTTP API
     volumes:
-      - ./data/videos:/videos  # Drop video files here
+      - ./.data/videos:/videos
+      - ./data/videos:/videos-legacy
+      - ./.data:/data
     networks:
       - omni-network
 
