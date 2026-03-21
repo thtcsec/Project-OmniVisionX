@@ -98,6 +98,8 @@ services:
       dockerfile: omni-simulator/Dockerfile
     container_name: omni-simulator
     restart: unless-stopped
+    environment:
+      - OMNI_SIMULATOR_AUTOSTART=${OMNI_SIMULATOR_AUTOSTART:-false}
     ports:
       - "${SIMULATOR_PORT:-8554}:8554"  # HTTP API
     volumes:

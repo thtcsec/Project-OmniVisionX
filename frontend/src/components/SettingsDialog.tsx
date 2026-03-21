@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Eye, EyeOff, Monitor, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n, type Locale } from "@/i18n/I18nProvider";
 import { fetchIntegrationEnvVars, updateIntegrationEnvVars, type IntegrationEnvVar } from "@/services/api";
@@ -57,6 +57,7 @@ export function SettingsDialog({ open, onOpenChange }: Props) {
       next[v.key] = v.isSecret ? "" : (v.value ?? "");
     }
     setDraft(next);
+    setSecretVisible({});
   }, [open, envQuery.data]);
 
   const saveMut = useMutation({
@@ -199,14 +200,44 @@ export function SettingsDialog({ open, onOpenChange }: Props) {
                             return (
                               <div key={v.key} className="grid gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] sm:items-center sm:gap-3">
                                 <Label className="text-xs leading-snug sm:pt-0">{v.label}</Label>
-                                <Input
-                                  className="h-9"
-                                  placeholder={placeholder}
-                                  value={draft[v.key] ?? ""}
-                                  onChange={(e) => setDraft((prev) => ({ ...prev, [v.key]: e.target.value }))}
-                                  type={v.isSecret ? "password" : "text"}
-                                  autoComplete="off"
-                                />
+                                {v.isSecret ? (
+                                  <div className="relative">
+                                    <Input
+                                      className="h-9 pr-10"
+                                      placeholder={placeholder}
+                                      value={draft[v.key] ?? ""}
+                                      onChange={(e) => setDraft((prev) => ({ ...prev, [v.key]: e.target.value }))}
+                                      type={secretVisible[v.key] ? "text" : "password"}
+                                      autoComplete="off"
+                                      spellCheck={false}
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="absolute right-0 top-0 h-9 w-9 text-muted-foreground hover:text-foreground"
+                                      onClick={() =>
+                                        setSecretVisible((prev) => ({ ...prev, [v.key]: !prev[v.key] }))
+                                      }
+                                      aria-label={secretVisible[v.key] ? t("settings.hideSecret") : t("settings.showSecret")}
+                                    >
+                                      {secretVisible[v.key] ? (
+                                        <EyeOff className="h-4 w-4" />
+                                      ) : (
+                                        <Eye className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Input
+                                    className="h-9"
+                                    placeholder={placeholder}
+                                    value={draft[v.key] ?? ""}
+                                    onChange={(e) => setDraft((prev) => ({ ...prev, [v.key]: e.target.value }))}
+                                    type="text"
+                                    autoComplete="off"
+                                  />
+                                )}
                               </div>
                             );
                           })}

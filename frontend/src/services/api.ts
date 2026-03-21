@@ -44,10 +44,12 @@ function simulatorVideosFromResponse(payload: unknown): SimulatorVideo[] {
     .map((item) => {
       const filename = typeof item.filename === "string" ? item.filename : "";
       const baseName = filename ? filename.replace(/\.[^.]+$/, "") : (typeof item.name === "string" ? item.name : "video");
+      const path = typeof item.path === "string" ? item.path : "";
       return {
         id: typeof item.id === "string" ? item.id : filename || baseName,
         name: typeof item.name === "string" ? item.name : baseName,
-        filename: filename || (typeof item.path === "string" ? item.path.split("/").pop() ?? baseName : baseName),
+        filename: filename || (path ? path.split("/").pop() ?? baseName : baseName),
+        path: path || undefined,
         duration: typeof item.duration === "number" ? item.duration : undefined,
       };
     });
@@ -102,15 +104,13 @@ export function normalizeCamera(raw: Record<string, unknown>): Camera {
   };
 }
 
-function cameraToApiBody(values: {
-  name: string;
-  streamUrl: string;
-  status: "online" | "offline";
-}) {
+function cameraToApiBody(values: { name: string; streamUrl: string }) {
+  const hasStream = values.streamUrl.trim().length > 0;
   return {
     name: values.name,
     streamUrl: values.streamUrl,
-    status: values.status,
+    // RTSP / stream presence drives availability — no manual online switch in UI
+    status: hasStream ? "online" : "offline",
     enableObjectDetection: true,
     enablePlateOcr: true,
     enableFaceRecognition: false,
@@ -170,8 +170,17 @@ export const rescanSimulatorVideos = async (opts?: { autoStart?: boolean }) =>
   simulatorVideosFromResponse(
     await request<unknown>(`${SIM_BASE}/simulator/videos/rescan?auto_start=${opts?.autoStart ? "true" : "false"}`, { method: "POST" }),
   );
-export const startSimulatorCamera = (id: string) =>
-  request<SimulatorCamera>(`${SIM_BASE}/simulator/cameras/${id}/start`, { method: "POST" });
+export const startSimulatorCamera = (cameraId: string, videoPath: string) =>
+  request<Record<string, unknown>>(`${SIM_BASE}/simulator/cameras/${encodeURIComponent(cameraId)}/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      video_path: videoPath,
+      loop: true,
+      fps: 30,
+      transcode_h264: true,
+    }),
+  });
 export const stopSimulatorCamera = (id: string) =>
   request<SimulatorCamera>(`${SIM_BASE}/simulator/cameras/${id}/stop`, { method: "POST" });
 

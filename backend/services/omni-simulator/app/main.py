@@ -36,6 +36,13 @@ class RelayConfig(BaseModel):
     transcode_h264: bool = True
 
 
+class StartCameraBody(BaseModel):
+    video_path: str
+    loop: bool = True
+    fps: int = 30
+    transcode_h264: bool = True
+
+
 # Global state
 _active_cameras: Dict[str, subprocess.Popen] = {}
 _ffmpeg_processes: Dict[str, subprocess.Popen] = {}
@@ -99,8 +106,11 @@ async def start_camera(camera_id: str, video_path: str, loop: bool = True, fps: 
     RTSP URL will be: rtsp://localhost:8554/{camera_id}
     """
     if camera_id in _active_cameras:
-        logger.warning(f"Camera {camera_id} already running")
-        return False
+        existing = _active_cameras[camera_id]
+        if existing.poll() is None:
+            logger.info("Camera %s already running — noop", camera_id)
+            return True
+        del _active_cameras[camera_id]
 
     if not os.path.exists(video_path):
         logger.error(f"Video file not found: {video_path}")
@@ -262,9 +272,15 @@ async def health():
 
 
 @app.post("/simulator/cameras/{camera_id}/start")
-async def api_start_camera(camera_id: str, video_path: str, loop: bool = True, fps: int = 30, transcode_h264: bool = True):
-    """Start a mock camera stream."""
-    success = await start_camera(camera_id, video_path, loop, fps, transcode_h264)
+async def api_start_camera(camera_id: str, body: StartCameraBody):
+    """Start a mock camera stream (JSON body: video_path, loop, fps, transcode_h264)."""
+    success = await start_camera(
+        camera_id,
+        body.video_path,
+        body.loop,
+        body.fps,
+        body.transcode_h264,
+    )
     if not success:
         raise HTTPException(status_code=400, detail="Failed to start camera")
     publish_host = os.getenv("OMNI_MEDIAMTX_RTSP_PUBLISH_HOST", "omni-mediamtx")
@@ -272,10 +288,10 @@ async def api_start_camera(camera_id: str, video_path: str, loop: bool = True, f
     return {
         "camera_id": camera_id,
         "rtsp_url": f"rtsp://{publish_host}:{publish_port}/{camera_id}",
-        "video_path": video_path,
-        "loop": loop,
-        "fps": fps,
-        "transcode_h264": transcode_h264,
+        "video_path": body.video_path,
+        "loop": body.loop,
+        "fps": body.fps,
+        "transcode_h264": body.transcode_h264,
     }
 
 

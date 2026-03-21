@@ -48,6 +48,8 @@ export interface SimulatorVideo {
   id: string;
   name: string;
   filename: string;
+  /** Absolute path inside the simulator container (for POST /start). */
+  path?: string;
   duration?: number;
 }
 

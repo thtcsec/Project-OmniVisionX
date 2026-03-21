@@ -36,26 +36,29 @@ export function buildDefaultWebRtcUrl(cameraId: string): string {
   return `${getMediaWebRtcBase()}/${encodeURIComponent(cameraId)}/whep`;
 }
 
+/**
+ * When the stream URL already targets MediaMTX (publisher path), HLS must use that path
+ * segment (e.g. cam-cam1), not the DB camera id — the API skips re-registering those URLs.
+ * Otherwise use camera id (matches API MediaMTX path registration for external RTSP).
+ */
 export function getCameraMediaKey(camera: { id: string; streamUrl?: string }): string {
   const raw = camera.streamUrl?.trim();
   if (!raw) return camera.id;
-
   try {
     const u = new URL(raw);
-    const isRtsp = u.protocol === "rtsp:" || u.protocol === "rtsps:";
-    if (!isRtsp) return camera.id;
-
+    if (u.protocol !== "rtsp:" && u.protocol !== "rtsps:") return camera.id;
     const host = u.hostname.toLowerCase();
-    const isMediaMtxHost = host === "omni-mediamtx" || host === "localhost" || host === "127.0.0.1";
-    if (!isMediaMtxHost) return camera.id;
-
-    const port = u.port || (u.protocol === "rtsps:" ? "322" : "554");
-    const isMediaMtxPort = port === "8554" || port === "18554";
-    if (!isMediaMtxPort) return camera.id;
-
-    const path = u.pathname.replace(/^\/+/, "").trim();
-    if (!path) return camera.id;
-    return path;
+    if (host !== "omni-mediamtx" && host !== "localhost" && host !== "127.0.0.1") return camera.id;
+    let port = u.port ? parseInt(u.port, 10) : NaN;
+    if (Number.isNaN(port)) {
+      port = u.protocol === "rtsps:" ? 322 : 554;
+    }
+    if (port !== 8554 && port !== 18554) return camera.id;
+    const seg = u.pathname
+      .replace(/^\/+/, "")
+      .split("/")
+      .filter(Boolean)[0];
+    return seg || camera.id;
   } catch {
     return camera.id;
   }

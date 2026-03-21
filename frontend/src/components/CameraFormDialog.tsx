@@ -9,32 +9,22 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { Camera } from "@/types/omni";
 
 export type CameraFormValues = {
   name: string;
   streamUrl: string;
-  status: "online" | "offline";
 };
 
 const emptyForm: CameraFormValues = {
   name: "",
   streamUrl: "",
-  status: "online",
 };
 
 function cameraToForm(cam: Camera): CameraFormValues {
   return {
     name: cam.name,
     streamUrl: cam.streamUrl ?? "",
-    status: cam.status,
   };
 }
 
@@ -92,25 +82,11 @@ export function CameraFormDialog({
                 id="cam-stream"
                 value={form.streamUrl}
                 onChange={(e) => setForm((f) => ({ ...f, streamUrl: e.target.value }))}
-                placeholder="rtsp://…"
+                placeholder="rtsp://omni-mediamtx:8554/cam-cam1"
               />
-            </div>
-            <div className="grid gap-2">
-              <Label>Status</Label>
-              <Select
-                value={form.status}
-                onValueChange={(v) =>
-                  setForm((f) => ({ ...f, status: v as "online" | "offline" }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="offline">Offline</SelectItem>
-                  <SelectItem value="online">Online</SelectItem>
-                </SelectContent>
-              </Select>
+              <p className="text-xs text-muted-foreground">
+                Cameras with a stream URL are treated as online for ingest and preview. Leave empty only if you truly have no source yet.
+              </p>
             </div>
           </div>
           <DialogFooter>

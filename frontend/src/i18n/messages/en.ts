@@ -36,6 +36,8 @@ export const en = {
     envDisabled: "Env editor is disabled on the API.",
     envFooter:
       "Changes apply to the API process. Other containers may still need a restart to pick up new values.",
+    showSecret: "Show API key",
+    hideSecret: "Hide API key",
   },
   live: {
     title: "Live preview",
@@ -68,6 +70,34 @@ export const en = {
   },
   cameras: {
     hackathonNote: "CRUD cameras (hackathon — no auth). Use JWT / API keys in production.",
+  },
+  simulator: {
+    title: "Simulator",
+    subtitle: "Manage mock camera streams for development.",
+    availableVideos: "Available Videos",
+    cameraStreams: "Camera Streams",
+    rescan: "Rescan",
+    name: "Name",
+    file: "File",
+    duration: "Duration",
+    actions: "Actions",
+    streamId: "Stream ID",
+    generateStream: "Generate stream",
+    generating: "Starting…",
+    noVideos: "No videos found on the simulator.",
+    noCameras: "No simulator cameras configured.",
+    rtspUrl: "RTSP URL",
+    status: "Status",
+    action: "Action",
+    start: "Start",
+    stop: "Stop",
+    videosRescanned: "Videos rescanned",
+    rescanFailed: "Rescan failed",
+    streamStarted: "Stream started",
+    streamStartFailed: "Failed to start stream",
+    streamStopped: "Stream stopped",
+    stopFailed: "Failed to stop stream",
+    missingPath: "Missing file path — rescan or check simulator volumes.",
   },
 } as const;
 
