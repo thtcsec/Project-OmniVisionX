@@ -76,6 +76,8 @@ services:
       - MediaMtx__ApiBaseUrl=http://omni-mediamtx:8997
       - MediaMtx__H264RelayEnabled=${MEDIAMTX_H264_RELAY_ENABLED:-true}
       - Simulator__ApiBaseUrl=http://omni-simulator:8554
+      - EnvEditor__Enabled=${OMNI_ENV_EDITOR_ENABLED:-true}
+      - EnvEditor__EnvFilePath=/app/.env
     depends_on:
       omni-db:
         condition: service_healthy
