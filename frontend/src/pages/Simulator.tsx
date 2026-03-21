@@ -1,17 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchSimulatorVideos, fetchSimulatorCameras, startSimulatorCamera, stopSimulatorCamera } from "@/services/api";
+import { fetchSimulatorVideos, fetchSimulatorCameras, rescanSimulatorVideos, startSimulatorCamera, stopSimulatorCamera } from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Play, Square, Film } from "lucide-react";
+import { Play, Square, Film, RefreshCcw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function Simulator() {
   const qc = useQueryClient();
   const { data: videos, isLoading: vLoading } = useQuery({ queryKey: ["sim-videos"], queryFn: fetchSimulatorVideos });
   const { data: cameras, isLoading: cLoading } = useQuery({ queryKey: ["sim-cameras"], queryFn: fetchSimulatorCameras, refetchInterval: 5000 });
+
+  const rescanMut = useMutation({
+    mutationFn: () => rescanSimulatorVideos(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sim-videos"] });
+      toast({ title: "Videos rescanned" });
+    },
+    onError: () => toast({ title: "Rescan failed", variant: "destructive" }),
+  });
 
   const startMut = useMutation({
     mutationFn: startSimulatorCamera,
@@ -33,7 +42,12 @@ export default function Simulator() {
 
       {/* Videos */}
       <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Film className="h-4 w-4" />Available Videos</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle className="text-base flex items-center gap-2"><Film className="h-4 w-4" />Available Videos</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => rescanMut.mutate()} disabled={rescanMut.isPending}>
+            <RefreshCcw className="h-3 w-3 mr-1" />Rescan
+          </Button>
+        </CardHeader>
         <CardContent>
           {vLoading ? <Skeleton className="h-24 w-full" /> : !videos || videos.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">No videos found on the simulator.</p>

@@ -169,6 +169,10 @@ export const fetchDashboardStats = () => request<DashboardStats>(`${API_BASE}/ap
 // Simulator
 export const fetchSimulatorVideos = async () => simulatorVideosFromResponse(await request<unknown>(`${SIM_BASE}/simulator/videos`));
 export const fetchSimulatorCameras = async () => simulatorCamerasFromResponse(await request<unknown>(`${SIM_BASE}/simulator/cameras`));
+export const rescanSimulatorVideos = async (opts?: { autoStart?: boolean }) =>
+  simulatorVideosFromResponse(
+    await request<unknown>(`${SIM_BASE}/simulator/videos/rescan?auto_start=${opts?.autoStart ? "true" : "false"}`, { method: "POST" }),
+  );
 export const startSimulatorCamera = (id: string) =>
   request<SimulatorCamera>(`${SIM_BASE}/simulator/cameras/${id}/start`, { method: "POST" });
 export const stopSimulatorCamera = (id: string) =>
