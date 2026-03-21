@@ -14,7 +14,11 @@ export const vi: MessageTree = {
   },
   settings: {
     title: "Cài đặt",
-    description: "Giao diện và ngôn ngữ hiển thị.",
+    description: "Giao diện, ngôn ngữ và khóa tích hợp API (nếu bật).",
+    tabGeneral: "Chung",
+    tabIntegrations: "Tích hợp",
+    integrationsTitle: "Tích hợp (sponsor)",
+    integrationsHint: "API key / endpoint (file .env phía server).",
     appearance: "Chủ đề",
     light: "Sáng",
     dark: "Tối",
@@ -26,6 +30,14 @@ export const vi: MessageTree = {
     language: "Ngôn ngữ",
     english: "English",
     vietnamese: "Tiếng Việt",
+    save: "Lưu",
+    saved: "Đã lưu",
+    saveFailed: "Lưu thất bại",
+    saving: "Đang lưu…",
+    loading: "Đang tải…",
+    envDisabled: "API đã tắt chỉnh sửa biến môi trường.",
+    envFooter:
+      "Thay đổi áp dụng cho tiến trình API. Container khác có thể cần restart để nhận giá trị mới.",
   },
   live: {
     title: "Xem trực tiếp",

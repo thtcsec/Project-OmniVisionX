@@ -12,7 +12,11 @@ export const en = {
   },
   settings: {
     title: "Settings",
-    description: "Theme and display language.",
+    description: "Appearance, language, and optional API integration keys.",
+    tabGeneral: "General",
+    tabIntegrations: "Integrations",
+    integrationsTitle: "Sponsor integrations",
+    integrationsHint: "API keys and endpoints (server-side .env).",
     appearance: "Theme",
     light: "Light",
     dark: "Dark",
@@ -24,6 +28,14 @@ export const en = {
     language: "Language",
     english: "English",
     vietnamese: "Vietnamese",
+    save: "Save",
+    saved: "Saved",
+    saveFailed: "Save failed",
+    saving: "Saving…",
+    loading: "Loading…",
+    envDisabled: "Env editor is disabled on the API.",
+    envFooter:
+      "Changes apply to the API process. Other containers may still need a restart to pick up new values.",
   },
   live: {
     title: "Live preview",
