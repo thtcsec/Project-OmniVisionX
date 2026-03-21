@@ -27,7 +27,7 @@ import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import type { OmniEvent, Detection } from "@/types/omni";
 
-const MEDIA_BASE = import.meta.env.OMNI_MEDIA_BASE_URL ?? "http://localhost:8888";
+import { buildDefaultHlsUrl, buildDefaultWebRtcUrl } from "@/lib/mediaUrls";
 
 export default function CameraDetail() {
   const { id } = useParams<{ id: string }>();
@@ -68,8 +68,14 @@ export default function CameraDetail() {
   });
 
   // Build stream URLs from camera or fallback
-  const hlsUrl = useMemo(() => camera?.hlsUrl ?? (camera?.streamUrl ? `${MEDIA_BASE}/${camera.id}/index.m3u8` : undefined), [camera]);
-  const webrtcUrl = useMemo(() => camera?.webrtcUrl ?? (camera?.streamUrl ? `${MEDIA_BASE}/${camera.id}/whep` : undefined), [camera]);
+  const hlsUrl = useMemo(
+    () => camera?.hlsUrl ?? (camera?.streamUrl ? buildDefaultHlsUrl(camera.id) : undefined),
+    [camera],
+  );
+  const webrtcUrl = useMemo(
+    () => camera?.webrtcUrl ?? (camera?.streamUrl ? buildDefaultWebRtcUrl(camera.id) : undefined),
+    [camera],
+  );
 
   const updateMut = useMutation({
     mutationFn: (v: CameraFormValues) => updateCamera(id!, v),

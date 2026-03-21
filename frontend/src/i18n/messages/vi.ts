@@ -41,11 +41,11 @@ export const vi: MessageTree = {
     joinSignalR: "Kết nối SignalR để nhận overlay.",
     streamUnavailable: "Không phát được luồng",
     noStreamConfigured: "Chưa cấu hình luồng",
-    troubleshootTitle: "Bị “Stream unavailable” hoặc ERR_CONNECTION_REFUSED cổng :8888?",
+    troubleshootTitle: "Bị “Stream unavailable” hoặc ERR_CONNECTION_REFUSED cổng :8888 / :8889?",
     troubleshootP1:
-      "Trang này ghép URL HLS/WebRTC vào cổng 8888 (MediaMTX). Không có service nào lắng nghe thì trình duyệt không tải được playlist hay WHEP.",
+      "HLS dùng cổng 8888; WebRTC (WHEP) dùng 8889 (mặc định MediaMTX). Không có service lắng nghe thì trình duyệt không tải được playlist hay WHEP.",
     troubleshootP2:
-      "Sau khi bật MediaMTX, tên path phải trùng ID camera (vd. /1/index.m3u8) và source của path phải là RTSP của bạn (cấu hình qua API MediaMTX hoặc relay omni-object).",
+      "Tên path phải trùng ID camera. Lưu camera trạng thái online + URL RTSP sẽ tự đăng ký MediaMTX (API + Docker). Hoặc dùng relay omni-object khi bật detection.",
   },
   about: {
     tagline:

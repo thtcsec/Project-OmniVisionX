@@ -20,11 +20,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from "lucide-react";
 import type { OmniEvent } from "@/types/omni";
 
-const MEDIA_BASE = import.meta.env.OMNI_MEDIA_BASE_URL ?? "http://localhost:8888";
+import { buildDefaultHlsUrl, buildDefaultWebRtcUrl } from "@/lib/mediaUrls";
+
+const CAMERA_NONE = "__none__";
 
 export default function LivePreview() {
   const { t } = useI18n();
-  const [cameraId, setCameraId] = useState<string | undefined>(undefined);
+  const [cameraId, setCameraId] = useState<string>(CAMERA_NONE);
   const [showTracks, setShowTracks] = useState(true);
   const [tracks, setTracks] = useState<Map<string, TrackOverlay>>(() => new Map());
 
@@ -33,21 +35,21 @@ export default function LivePreview() {
   const { data: camera } = useQuery({
     queryKey: ["camera", cameraId],
     queryFn: () => fetchCamera(cameraId),
-    enabled: !!cameraId,
+    enabled: !!cameraId && cameraId !== CAMERA_NONE,
   });
 
   const hlsUrl = useMemo(
-    () => camera?.hlsUrl ?? (camera?.streamUrl ? `${MEDIA_BASE}/${camera.id}/index.m3u8` : undefined),
+    () => camera?.hlsUrl ?? (camera?.streamUrl ? buildDefaultHlsUrl(camera.id) : undefined),
     [camera],
   );
   const webrtcUrl = useMemo(
-    () => camera?.webrtcUrl ?? (camera?.streamUrl ? `${MEDIA_BASE}/${camera.id}/whep` : undefined),
+    () => camera?.webrtcUrl ?? (camera?.streamUrl ? buildDefaultWebRtcUrl(camera.id) : undefined),
     [camera],
   );
 
   const mergeEvent = useCallback(
     (event: OmniEvent) => {
-      if (!cameraId || event.cameraId !== cameraId) return;
+      if (!cameraId || cameraId === CAMERA_NONE || event.cameraId !== cameraId) return;
       const parsed = parseBboxFromOmniEvent(event);
       if (!parsed) return;
       setTracks((prev) => {
@@ -60,7 +62,7 @@ export default function LivePreview() {
   );
 
   useEffect(() => {
-    if (!cameraId) return;
+    if (!cameraId || cameraId === CAMERA_NONE) return;
     joinCameraGroup(cameraId);
     const unsub = onOmniEvent(mergeEvent);
     return () => {
@@ -70,7 +72,7 @@ export default function LivePreview() {
   }, [cameraId, mergeEvent]);
 
   useEffect(() => {
-    if (!cameraId) {
+    if (!cameraId || cameraId === CAMERA_NONE) {
       setTracks(new Map());
       return;
     }
@@ -102,7 +104,7 @@ export default function LivePreview() {
         <AlertTitle>{t("live.troubleshootTitle")}</AlertTitle>
         <AlertDescription className="text-xs mt-2 space-y-2 [&_code]:block [&_code]:text-[11px] [&_code]:bg-muted [&_code]:px-2 [&_code]:py-1 [&_code]:rounded [&_code]:mt-1">
           <p>{t("live.troubleshootP1")}</p>
-          <code>docker compose --profile media up -d omni-mediamtx</code>
+          <code>docker compose up -d omni-mediamtx</code>
           <p>{t("live.troubleshootP2")}</p>
         </AlertDescription>
       </Alert>
@@ -116,14 +118,12 @@ export default function LivePreview() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex-1 space-y-2">
               <Label>{t("live.selectCamera")}</Label>
-              <Select
-                value={cameraId || undefined}
-                onValueChange={(v) => setCameraId(v)}
-              >
+              <Select value={cameraId} onValueChange={setCameraId}>
                 <SelectTrigger>
                   <SelectValue placeholder={t("live.pickCamera")} />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={CAMERA_NONE}>{t("live.pickCamera")}</SelectItem>
                   {(cameras ?? []).map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
@@ -140,15 +140,15 @@ export default function LivePreview() {
             </div>
           </div>
 
-          {!cameraId && (
+          {cameraId === CAMERA_NONE && (
             <p className="text-sm text-muted-foreground">{t("live.pickCamera")}</p>
           )}
 
-          {cameraId && !hlsUrl && !webrtcUrl && (
+          {cameraId !== CAMERA_NONE && !hlsUrl && !webrtcUrl && (
             <p className="text-sm text-amber-600 dark:text-amber-400">{t("live.noStream")}</p>
           )}
 
-          {cameraId && (
+          {cameraId !== CAMERA_NONE && (
             <>
               <LiveStreamPlayer
                 hlsUrl={hlsUrl}

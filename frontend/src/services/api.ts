@@ -82,7 +82,8 @@ function simulatorCamerasFromResponse(payload: unknown): SimulatorCamera[] {
 export function normalizeCamera(raw: Record<string, unknown>): Camera {
   const id = String(raw.id ?? "");
   const name = String(raw.name ?? "");
-  const status: "online" | "offline" = raw.status === "online" ? "online" : "offline";
+  const statusRaw = typeof raw.status === "string" ? raw.status.toLowerCase() : "";
+  const status: "online" | "offline" = statusRaw === "online" ? "online" : "offline";
   const features = {
     objectDetection: Boolean(raw.enableObjectDetection ?? (raw.features as Record<string, unknown>)?.objectDetection),
     plateRecognition: Boolean(raw.enablePlateOcr ?? (raw.features as Record<string, unknown>)?.plateRecognition),

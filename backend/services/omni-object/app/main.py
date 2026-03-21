@@ -322,7 +322,8 @@ async def _get_active_cameras(engine) -> Optional[Dict[str, str]]:
 
             relay_cameras = {}
             for cam_id, raw_url in raw_cameras.items():
-                path_name = f"cam_{cam_id}"
+                # Path name MUST match web UI: http://host:8888/{cameraId}/index.m3u8
+                path_name = cam_id
                 relay_url = f"{settings.mediamtx_rtsp_url}/{path_name}"
                 await _ensure_mediamtx_path(settings, path_name, raw_url)
                 relay_cameras[cam_id] = relay_url

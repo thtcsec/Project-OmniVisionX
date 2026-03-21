@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Omni.API.Data;
 using Omni.API.Hubs;
 using Omni.API.Models;
+using Omni.API.Services;
 
 namespace Omni.API.Controllers;
 
@@ -13,11 +14,13 @@ public class CamerasController : ControllerBase
 {
     private readonly OmniDbContext _db;
     private readonly IHubContext<OmniHub> _hub;
+    private readonly MediaMtxPathRegistrar _mediaMtx;
 
-    public CamerasController(OmniDbContext db, IHubContext<OmniHub> hub)
+    public CamerasController(OmniDbContext db, IHubContext<OmniHub> hub, MediaMtxPathRegistrar mediaMtx)
     {
         _db = db;
         _hub = hub;
+        _mediaMtx = mediaMtx;
     }
 
     [HttpGet]
@@ -86,6 +89,9 @@ public class CamerasController : ControllerBase
         await _db.SaveChangesAsync();
 
         await _hub.Clients.Group("omni-all").SendAsync("CamerasChanged", new { action = "updated", id });
+
+        if (string.Equals(camera.Status, "online", StringComparison.OrdinalIgnoreCase))
+            await _mediaMtx.TryRegisterPathAsync(camera.Id, camera.StreamUrl);
 
         return NoContent();
     }

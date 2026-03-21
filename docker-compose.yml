@@ -73,10 +73,13 @@ services:
     environment:
       - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING:-Host=omni-db;Database=omnivision;Username=postgres;Password=admin}
       - Redis__ConnectionString=${REDIS_CONNECTION_STRING:-omni-bus:6379,abortConnect=false}
+      - MediaMtx__ApiBaseUrl=http://omni-mediamtx:8997
     depends_on:
       omni-db:
         condition: service_healthy
       omni-bus:
+        condition: service_started
+      omni-mediamtx:
         condition: service_started
     networks:
       - omni-network
@@ -103,8 +106,9 @@ services:
   # ============================================
   omni-object:
     build:
-      context: ./backend
-      dockerfile: services/omni-object/Dockerfile
+      # Repo-root context: Dockerfile needs ../shared (not under backend/)
+      context: .
+      dockerfile: backend/services/omni-object/Dockerfile
     container_name: omni-object
     restart: unless-stopped
     profiles:
@@ -198,16 +202,13 @@ services:
 
   # ============================================
   # MEDIAMTX - RTSP → HLS / WebRTC (browser playback)
-  # UI defaults to http://localhost:8888/<cameraId>/index.m3u8
-  # Start: docker compose --profile media up -d omni-mediamtx
+  # UI: HLS http://localhost:8888/<cameraId>/index.m3u8, WHEP http://localhost:8889/<cameraId>/whep
   # Paths must point at your RTSP URLs (API / omni-object relay, or add paths via MediaMTX API).
   # ============================================
   omni-mediamtx:
     image: bluenviron/mediamtx:latest
     container_name: omni-mediamtx
     restart: unless-stopped
-    profiles:
-      - media
     ports:
       - "${MEDIAMTX_HLS_PORT:-8888}:8888"
       - "${MEDIAMTX_WEBRTC_PORT:-8889}:8889"
@@ -230,7 +231,10 @@ services:
     ports:
       - "${UI_PORT:-3000}:80"
     depends_on:
-      - omni-api
+      omni-api:
+        condition: service_started
+      omni-mediamtx:
+        condition: service_started
     networks:
       - omni-network
 

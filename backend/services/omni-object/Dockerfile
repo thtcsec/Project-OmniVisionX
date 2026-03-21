@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # omni-object: RTSP flow + YOLO (YOLOv11 + ByteTrack) + Redis Streams
-# Build context: ./backend (Project OmniVision)
+# Build context: repository ROOT (docker-compose context: .) — includes shared/
 
 FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
 
@@ -43,15 +43,13 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install "numpy<2.0"
 
 # Install requirements
-COPY services/omni-object/requirements.txt /app/requirements.txt
+COPY backend/services/omni-object/requirements.txt /app/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r /app/requirements.txt
 
 WORKDIR /app
 
 # ── Pre-download YOLO yolo11m.pt during build (~39MB) ──
-# Saves runtime download. Cached at /opt/yolo-cache/ (NOT in /app/weights which is a volume).
-# The entrypoint copies it to the volume on first boot.
 RUN mkdir -p /opt/yolo-cache && \
     python -c "\
 from ultralytics import YOLO; import shutil, os; \
@@ -62,8 +60,8 @@ if src and os.path.isfile(src): shutil.copy2(src, dst); print(f'✅ Copied {src}
 else: print('⚠️ ckpt_path not found')" \
     || echo "⚠️ YOLO pre-download failed — will download at runtime"
 
-# Copy application code and shared utilities
-COPY services/omni-object/app /app/app
+# Copy application code and shared utilities (shared/ lives at repo root)
+COPY backend/services/omni-object/app /app/app
 COPY shared /app/shared
 
 # Create necessary directories
@@ -78,7 +76,7 @@ EXPOSE 8555
 ENV PYTHONPATH="/app:/opt/venv/lib/python3.11/site-packages:$PYTHONPATH"
 
 # Copy entrypoint
-COPY services/omni-object/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY backend/services/omni-object/docker-entrypoint.sh /app/docker-entrypoint.sh
 
 # Normalize line endings so Linux can execute the script
 RUN sed -i 's/\r$//' /app/docker-entrypoint.sh

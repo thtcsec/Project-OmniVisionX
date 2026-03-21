@@ -33,10 +33,11 @@ export function useCameraStream({ hlsUrl, webrtcUrl }: UseCameraStreamOptions) {
         };
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
+        // No custom Content-Type: browser sends text/plain — avoids CORS preflight
+        // rejecting application/sdp on MediaMTX webrtcAllowOrigins.
         const res = await fetch(webrtcUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/sdp" },
-          body: offer.sdp,
+          body: offer.sdp ?? "",
         });
         if (!res.ok) throw new Error("WHEP failed");
         const answer = await res.text();
@@ -78,10 +79,11 @@ export function useCameraStream({ hlsUrl, webrtcUrl }: UseCameraStreamOptions) {
     }
 
     (async () => {
-      const webrtcOk = await tryWebRTC();
-      if (!webrtcOk && !cancelled) {
-        const hlsOk = tryHLS();
-        if (!hlsOk && !cancelled) setStreamStatus("error");
+      // HLS on :8888 is the usual path; WHEP lives on :8889 — try HLS first.
+      const hlsOk = tryHLS();
+      if (!hlsOk && !cancelled) {
+        const webrtcOk = await tryWebRTC();
+        if (!webrtcOk && !cancelled) setStreamStatus("error");
       }
     })();
 

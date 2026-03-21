@@ -1,0 +1,19 @@
+# Used when build context is repo root (e.g. omni-object)
+.git
+.gitignore
+**/.DS_Store
+**/node_modules
+frontend/dist
+**/__pycache__
+**/*.pyc
+**/.venv
+**/.env
+**/.env.*
+data/
+models/yolo/*.pt
+models/yolo/*.pth
+*.md
+.cursor
+.idea
+.vscode
+.image

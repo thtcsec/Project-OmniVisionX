@@ -18,6 +18,13 @@ builder.Services.AddDbContext<OmniDbContext>(options =>
 // Add Redis
 builder.Services.AddSingleton<RedisService>();
 
+// MediaMTX — register camera paths for browser HLS/WebRTC (path name = camera Id)
+builder.Services.AddHttpClient<MediaMtxPathRegistrar>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(12);
+});
+builder.Services.AddHostedService<MediaMtxStartupSync>();
+
 // Add Background Services
 builder.Services.AddHostedService<OmniEventConsumerService>();
 

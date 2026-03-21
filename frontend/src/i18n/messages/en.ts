@@ -39,11 +39,11 @@ export const en = {
     joinSignalR: "Connect to SignalR to receive overlays.",
     streamUnavailable: "Stream unavailable",
     noStreamConfigured: "No stream configured",
-    troubleshootTitle: "Seeing “Stream unavailable” or ERR_CONNECTION_REFUSED on :8888?",
+    troubleshootTitle: "Seeing “Stream unavailable” or ERR_CONNECTION_REFUSED on :8888 / :8889?",
     troubleshootP1:
-      "This page builds HLS/WebRTC URLs on port 8888 (MediaMTX). If no server listens there, the browser cannot load the playlist or WHEP endpoint.",
+      "HLS uses port 8888; WebRTC (WHEP) uses 8889 (MediaMTX defaults). If nothing listens on those ports, the browser cannot load the playlist or WHEP endpoint.",
     troubleshootP2:
-      "After MediaMTX is up, the path name must match your camera ID (e.g. /1/index.m3u8) and the path’s source must be your RTSP URL (configure via MediaMTX API or omni-object relay).",
+      "Path name must match your camera ID. Saving an online camera with an RTSP URL registers it in MediaMTX automatically (API + Docker). Or use omni-object relay when detection is enabled.",
   },
   about: {
     tagline:

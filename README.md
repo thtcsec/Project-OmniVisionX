@@ -116,13 +116,15 @@ Stream URL accepts **rtsp(s)://** or **http(s)://** (e.g. HLS later). After muta
 
 Spa route **Live preview** plays the camera HLS/WebRTC URL (same convention as camera detail + `OMNI_MEDIA_BASE_URL`) and optionally draws **bounding boxes** from **`OmniEvent`** (Redis → `OmniEventConsumerService` → SignalR). Toggle **Show tracking overlays** to enable/disable. UI supports **English / Vietnamese** and persists locale in `localStorage` (`omnivisionx-locale`).
 
-**If you see “Stream unavailable” / `ERR_CONNECTION_REFUSED` on port 8888:** the UI defaults to `http://localhost:8888/<cameraId>/index.m3u8` (MediaMTX). Start the relay:
+**If you see “Stream unavailable” / `ERR_CONNECTION_REFUSED` on ports 8888 or 8889:** the UI defaults to HLS `http://localhost:8888/<cameraId>/index.m3u8` and WHEP `http://localhost:8889/<cameraId>/whep` (MediaMTX). Start the relay:
 
 ```powershell
-docker compose --profile media up -d omni-mediamtx
+docker compose up -d omni-mediamtx
 ```
 
-Then ensure MediaMTX has a **path** whose name matches the camera **ID** and whose **source** is your RTSP URL (via MediaMTX API or `omni-object` relay when enabled).
+Optional env: `OMNI_MEDIA_WEBRTC_BASE_URL` if WebRTC is not on the same host with port 8889.
+
+The **API** registers MediaMTX paths automatically when you **save** a camera as **online** with an **RTSP** URL (`MediaMtx__ApiBaseUrl` in Docker). Path name = camera **ID** (same as the HLS URL). `omni-object` also registers paths when detection is enabled and relay is on.
 
 ## Security note (hackathon vs production)
 
