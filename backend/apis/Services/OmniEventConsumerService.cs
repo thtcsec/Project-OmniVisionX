@@ -1,61 +1,73 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
 using Omni.API.Hubs;
 using StackExchange.Redis;
 
 namespace Omni.API.Services;
 
+/// <summary>
+/// Consumes Redis Streams (XREADGROUP) and pushes SignalR <c>OmniEvent</c> to clients.
+/// Python publishers use fields: camera_id, class_name, bbox, confidence, timestamp, etc.
+/// </summary>
 public class OmniEventConsumerService : BackgroundService
 {
+    private const string ConsumerGroup = "omni-api-consumers";
+    private readonly string _consumerName =
+        $"api-{Environment.MachineName}-{Environment.ProcessId}";
+
     private readonly ILogger<OmniEventConsumerService> _logger;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly RedisService _redis;
     private readonly IHubContext<OmniHub> _hubContext;
 
-    // Redis stream keys to consume
     private readonly string[] _streamKeys = { "omni:detections", "omni:vehicles", "omni:humans" };
 
     public OmniEventConsumerService(
         ILogger<OmniEventConsumerService> logger,
-        IServiceProvider serviceProvider,
+        RedisService redis,
         IHubContext<OmniHub> hubContext)
     {
         _logger = logger;
-        _serviceProvider = serviceProvider;
+        _redis = redis;
         _hubContext = hubContext;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("OmniEventConsumerService starting...");
+        _logger.LogInformation("OmniEventConsumerService starting (consumer {Consumer})…", _consumerName);
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                using var scope = _serviceProvider.CreateScope();
-                var redis = scope.ServiceProvider.GetRequiredService<RedisService>();
-                var db = redis.GetDatabase();
+                var db = _redis.GetDatabase();
 
-                // Scan for new messages using blocking read
                 foreach (var streamKey in _streamKeys)
                 {
                     try
                     {
-                        var entries = await db.StreamReadAsync(streamKey, "omni-api-consumers", count: 10);
+                        await EnsureConsumerGroupAsync(db, streamKey);
+
+                        // ">" = only new messages for this consumer group (XREADGROUP … STREAMS key >)
+                        var entries = await db.StreamReadGroupAsync(
+                            streamKey,
+                            ConsumerGroup,
+                            _consumerName,
+                            ">",
+                            count: 25);
 
                         foreach (var entry in entries)
                         {
-                            await ProcessEntry(streamKey, entry);
-                            await db.StreamAcknowledgeAsync(streamKey, "omni-api-consumers", entry.Id);
+                            await ProcessEntryAsync(streamKey, entry);
+                            await db.StreamAcknowledgeAsync(streamKey, ConsumerGroup, entry.Id);
                         }
                     }
-                    catch (RedisServerException ex) when (ex.Message.Contains("NOGROUP"))
+                    catch (RedisServerException ex) when (ex.Message.Contains("NOGROUP", StringComparison.OrdinalIgnoreCase))
                     {
-                        // Create consumer group if not exists
-                        await db.StreamCreateConsumerGroupAsync(streamKey, "omni-api-consumers", "0", createStream: true);
+                        await EnsureConsumerGroupAsync(db, streamKey);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning("Error reading stream {Stream}: {Error}", streamKey, ex.Message);
+                        _logger.LogWarning(ex, "Error reading stream {Stream}: {Message}", streamKey, ex.Message);
                     }
                 }
 
@@ -73,31 +85,98 @@ public class OmniEventConsumerService : BackgroundService
         }
     }
 
-    private async Task ProcessEntry(string streamKey, StreamEntry entry)
+    private async Task EnsureConsumerGroupAsync(IDatabase db, string streamKey)
     {
-        var eventType = entry.Values.FirstOrDefault(e => e.Name == "event_type").Value.ToString();
-        var cameraId = entry.Values.FirstOrDefault(e => e.Name == "camera_id").Value.ToString();
-        var payload = entry.Values.FirstOrDefault(e => e.Name == "payload").Value.ToString();
-
-        // Broadcast to camera group
-        if (!string.IsNullOrEmpty(cameraId))
+        try
         {
-            await _hubContext.Clients.Group($"camera-{cameraId}").SendAsync("OmniEvent", new
-            {
-                type = eventType,
-                cameraId,
-                data = payload,
-                timestamp = DateTime.UtcNow
-            });
+            // "$" = group starts at tail — avoid flooding UI with full history on first deploy
+            await db.StreamCreateConsumerGroupAsync(streamKey, ConsumerGroup, "$", createStream: true);
+            _logger.LogInformation("Created consumer group {Group} on {Stream}", ConsumerGroup, streamKey);
         }
+        catch (RedisServerException ex) when (ex.Message.Contains("BUSYGROUP", StringComparison.OrdinalIgnoreCase))
+        {
+            // Already exists
+        }
+    }
 
-        // Broadcast to all subscribers
-        await _hubContext.Clients.Group("omni-all").SendAsync("OmniEvent", new
+    private async Task ProcessEntryAsync(string streamKey, StreamEntry entry)
+    {
+        var fields = entry.Values.ToDictionary(
+            v => v.Name.ToString(),
+            v => v.Value.ToString() ?? string.Empty,
+            StringComparer.Ordinal);
+
+        var cameraId = fields.GetValueOrDefault("camera_id") ?? "";
+
+        var eventType = ResolveEventType(streamKey, fields);
+
+        var payload = BuildPayloadJson(streamKey, fields);
+
+        var omniEvent = new
         {
             type = eventType,
             cameraId,
             data = payload,
-            timestamp = DateTime.UtcNow
-        });
+            timestamp = DateTime.UtcNow.ToString("o"),
+        };
+
+        if (!string.IsNullOrEmpty(cameraId))
+        {
+            await _hubContext.Clients.Group($"camera-{cameraId}").SendAsync("OmniEvent", omniEvent);
+        }
+
+        await _hubContext.Clients.Group("omni-all").SendAsync("OmniEvent", omniEvent);
+    }
+
+    private static string ResolveEventType(string streamKey, Dictionary<string, string> fields)
+    {
+        if (streamKey.EndsWith(":vehicles", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrEmpty(fields.GetValueOrDefault("plate_text")))
+                return "plate";
+            return "vehicle";
+        }
+
+        if (streamKey.EndsWith(":humans", StringComparison.OrdinalIgnoreCase))
+            return "human";
+
+        return "detection";
+    }
+
+    private static string BuildPayloadJson(string streamKey, Dictionary<string, string> fields)
+    {
+        // Match EventFeed: label, plateText, type
+        object payload = streamKey switch
+        {
+            var s when s.EndsWith(":vehicles", StringComparison.OrdinalIgnoreCase) => new
+            {
+                label = fields.GetValueOrDefault("class_name"),
+                plateText = fields.GetValueOrDefault("plate_text"),
+                bbox = fields.GetValueOrDefault("bbox"),
+                confidence = fields.GetValueOrDefault("confidence"),
+                plateConfidence = fields.GetValueOrDefault("plate_confidence"),
+                vehicleColor = fields.GetValueOrDefault("vehicle_color"),
+                timestamp = fields.GetValueOrDefault("timestamp"),
+            },
+            var s when s.EndsWith(":humans", StringComparison.OrdinalIgnoreCase) => new
+            {
+                label = fields.GetValueOrDefault("class_name"),
+                faceIdentity = fields.GetValueOrDefault("face_identity"),
+                bbox = fields.GetValueOrDefault("bbox"),
+                confidence = fields.GetValueOrDefault("confidence"),
+                faceConfidence = fields.GetValueOrDefault("face_confidence"),
+                timestamp = fields.GetValueOrDefault("timestamp"),
+            },
+            _ => new
+            {
+                label = fields.GetValueOrDefault("class_name"),
+                globalTrackId = fields.GetValueOrDefault("global_track_id"),
+                bbox = fields.GetValueOrDefault("bbox"),
+                confidence = fields.GetValueOrDefault("confidence"),
+                timestamp = fields.GetValueOrDefault("timestamp"),
+            },
+        };
+
+        return JsonSerializer.Serialize(payload);
     }
 }

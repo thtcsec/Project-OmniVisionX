@@ -30,7 +30,7 @@ export function AppLayout() {
           <header className="h-14 flex items-center justify-between border-b px-4 bg-background">
             <div className="flex items-center gap-3">
               <SidebarTrigger />
-              <h2 className="text-lg font-semibold text-foreground hidden sm:block">OmniVision</h2>
+              <h2 className="text-lg font-semibold text-foreground hidden sm:block">OmniVisionX</h2>
             </div>
             <ConnectionStatus status={status} />
           </header>

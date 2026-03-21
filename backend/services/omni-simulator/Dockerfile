@@ -1,4 +1,5 @@
-# OmniVision Simulator - Mock Camera RTSP Server
+# syntax=docker/dockerfile:1.4
+# OmniVision Simulator — pip cache khi rebuild (DOCKER_BUILDKIT=1).
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
@@ -11,7 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY omni-simulator/requirements.txt /app/requirements.txt
-RUN pip install --upgrade pip && pip install -r /app/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && pip install -r /app/requirements.txt
 
 # Create videos directory for dropping video files
 RUN mkdir -p /videos

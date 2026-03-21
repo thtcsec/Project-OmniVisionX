@@ -10,7 +10,11 @@ public class RedisService
     public RedisService(IConfiguration configuration)
     {
         var connectionString = configuration["Redis:ConnectionString"] ?? "localhost:6379";
-        _redis = ConnectionMultiplexer.Connect(connectionString);
+        var opts = ConfigurationOptions.Parse(connectionString);
+        opts.AbortOnConnectFail = false;
+        opts.ConnectRetry = 5;
+        opts.ConnectTimeout = 10_000;
+        _redis = ConnectionMultiplexer.Connect(opts);
         _db = _redis.GetDatabase();
     }
 

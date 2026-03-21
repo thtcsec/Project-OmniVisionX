@@ -1,7 +1,9 @@
 import * as signalR from "@microsoft/signalr";
 import type { OmniEvent } from "@/types/omni";
 
-const SIGNALR_URL = import.meta.env.OMNI_SIGNALR_URL ?? import.meta.env.OMNI_API_BASE_URL ?? "http://localhost:8080";
+// Same-origin: nginx (Docker) or Vite proxy forwards /hubs → omni-api. Override with OMNI_SIGNALR_URL if needed.
+const SIGNALR_URL =
+  import.meta.env.OMNI_SIGNALR_URL ?? import.meta.env.OMNI_API_BASE_URL ?? "";
 const HUB_PATH = import.meta.env.OMNI_SIGNALR_HUB_PATH ?? "/hubs/omni";
 
 let connection: signalR.HubConnection | null = null;

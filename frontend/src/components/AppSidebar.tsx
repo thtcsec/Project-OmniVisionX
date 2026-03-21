@@ -35,7 +35,7 @@ export function AppSidebar() {
               <Camera className="h-4 w-4 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-sm font-semibold text-sidebar-foreground">OmniVision</h1>
+              <h1 className="text-sm font-semibold text-sidebar-foreground">OmniVisionX</h1>
               <p className="text-[10px] text-muted-foreground">Traffic Analytics</p>
             </div>
           </div>

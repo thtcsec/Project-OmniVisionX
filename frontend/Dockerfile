@@ -1,12 +1,14 @@
-# Project OmniVision UI — Vite build + nginx (proxies API & SignalR to omni-api)
+# syntax=docker/dockerfile:1.4
+# Project OmniVisionX UI — npm layer cached when package*.json unchanged (DOCKER_BUILDKIT=1).
 FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm config set fetch-retries 5 \
+RUN --mount=type=cache,target=/root/.npm \
+    npm config set fetch-retries 5 \
     && npm config set fetch-retry-mintimeout 20000 \
     && npm config set fetch-retry-maxtimeout 120000 \
-    && npm install --no-audit --no-fund
+    && sh -c 'if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi'
 
 COPY index.html vite.config.ts tsconfig.json tsconfig.app.json tsconfig.node.json tailwind.config.ts postcss.config.js ./
 COPY public ./public
