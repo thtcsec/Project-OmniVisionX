@@ -17,6 +17,7 @@ from typing import Optional, Dict
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 logging.basicConfig(level=logging.INFO)
@@ -62,6 +63,23 @@ app = FastAPI(
     description="Mock Camera RTSP Server - Loop video files as camera streams",
     version="1.0.0",
     lifespan=lifespan,
+)
+
+_cors_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "OMNI_SIMULATOR_CORS_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
+    if origin.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
