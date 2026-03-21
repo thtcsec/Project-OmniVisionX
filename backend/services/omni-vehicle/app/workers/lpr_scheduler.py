@@ -107,25 +107,28 @@ class LprScheduler:
 
     async def _get_active_cameras(self) -> Dict[str, dict]:
         try:
+            allow_raw = os.environ.get("LPR_CAMERA_ALLOWLIST", "").strip()
+            allow = {x.strip() for x in allow_raw.split(",") if x.strip()} if allow_raw else None
             async with self._engine.connect() as conn:
                 result = await conn.execute(
                     text(
-                        'SELECT "Id", "StreamUrl", "RoiPolygon", "EnablePlateOcr" '
-                        'FROM "Cameras" WHERE "Status" = \'Online\''
+                        'SELECT "Id", "StreamUrl", "EnablePlateOcr" '
+                        'FROM "Cameras" WHERE LOWER(TRIM("Status")) = \'online\''
                     )
                 )
                 rows = result.fetchall()
                 cameras: Dict[str, dict] = {}
                 for row in rows:
                     camera_id = str(row[0])
+                    if allow is not None and camera_id not in allow:
+                        continue
                     stream_url = row[1]
-                    roi_json = row[2]
-                    enable_plate = row[3] if row[3] is not None else True
+                    enable_plate = row[2] if row[2] is not None else True
                     if not stream_url or not enable_plate:
                         continue
                     cameras[camera_id] = {
                         "url": stream_url,
-                        "roi": _parse_roi(roi_json),
+                        "roi": None,
                     }
                 if cameras:
                     logger.info("📹 LPR scheduler cameras: %s", len(cameras))
@@ -147,7 +150,7 @@ class LprScheduler:
                     roi_points=cfg.get("roi"),
                     is_night=False,
                     use_tracking=True,
-                    use_fortress=True,
+                    use_fortress=False,
                     dedup=True,
                 )
             except Exception:

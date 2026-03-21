@@ -11,11 +11,14 @@ public class StatsController : ControllerBase
 {
     private readonly OmniDbContext _db;
     private readonly Services.RedisService _redis;
+    private readonly string _redisStreamPrefix;
 
-    public StatsController(OmniDbContext db, Services.RedisService redisService)
+    public StatsController(OmniDbContext db, Services.RedisService redisService, IConfiguration configuration)
     {
         _db = db;
         _redis = redisService;
+        var prefix = (configuration["Omni:RedisStreamPrefix"] ?? "omni").Trim();
+        _redisStreamPrefix = string.IsNullOrEmpty(prefix) ? "omni" : prefix;
     }
 
     [HttpGet("dashboard")]
@@ -40,8 +43,8 @@ public class StatsController : ControllerBase
 
         try
         {
-            detectionsToday = await _redis.StreamLengthAsync("omni:detections");
-            platesDetected = await _redis.StreamLengthAsync("omni:vehicles");
+            detectionsToday = await _redis.StreamLengthAsync($"{_redisStreamPrefix}:detections");
+            platesDetected = await _redis.StreamLengthAsync($"{_redisStreamPrefix}:vehicles");
         }
         catch
         {

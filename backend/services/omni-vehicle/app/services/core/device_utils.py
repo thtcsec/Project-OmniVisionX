@@ -39,7 +39,7 @@ def cuda_is_usable() -> bool:
 def resolve_device(preferred: str = "cuda") -> str:
     """Resolve preferred device to a safe string ('cuda' or 'cpu')."""
     if preferred.lower().startswith("cuda") and cuda_is_usable():
-        return "cuda"
+        return "cuda:0"
     return "cpu"
 
 

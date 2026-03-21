@@ -7,11 +7,16 @@ import cv2
 import numpy as np
 
 logger = logging.getLogger("omni-vehicle.stream_thumbnail")
+try:
+    from app.services.storage.s3_uploader import try_build_uploader
+except Exception:
+    try_build_uploader = None
 
 
 class LprThumbnailService:
     def __init__(self, settings):
         self.settings = settings
+        self._uploader = try_build_uploader(settings) if try_build_uploader else None
 
     @staticmethod
     def _derive_vehicle_bbox_from_plate(
@@ -185,6 +190,25 @@ class LprThumbnailService:
 
             if not plate_saved and not frame_saved:
                 return "", ""
+            if self._uploader:
+                try:
+                    plate_ref = plate_basename
+                    frame_ref = frame_basename
+                    if plate_basename:
+                        key = f"plates/{camera_id}/{plate_basename}"
+                        with open(os.path.join(thumb_dir, plate_basename), "rb") as f:
+                            _, url = self._uploader.put_jpeg_and_url(key, f.read())
+                        if url:
+                            plate_ref = url
+                    if frame_basename:
+                        key = f"frames/{camera_id}/{frame_basename}"
+                        with open(os.path.join(thumb_dir, frame_basename), "rb") as f:
+                            _, url = self._uploader.put_jpeg_and_url(key, f.read())
+                        if url:
+                            frame_ref = url
+                    return plate_ref, frame_ref
+                except Exception as e:
+                    logger.warning("Failed to upload to MinIO: %s", e)
             return plate_basename, frame_basename
         except Exception as e:
             logger.warning("Failed to save thumbnails: %s", e)

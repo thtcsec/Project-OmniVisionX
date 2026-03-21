@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -36,9 +37,21 @@ public sealed class CameraChatController : ControllerBase
         var qwenBase = _env.Get("OMNI_QWEN_BASE_URL") ?? "https://dashscope.aliyuncs.com/compatible-mode/v1";
         var qwenModel = _env.Get("OMNI_QWEN_MODEL_ID") ?? "qwen-plus";
 
-        var provider = !string.IsNullOrWhiteSpace(openAiKey) ? "openai" : (!string.IsNullOrWhiteSpace(qwenKey) ? "qwen" : "");
+        var difyKey = _env.Get("OMNI_DIFY_API_KEY");
+        var difyBase = (_env.Get("OMNI_DIFY_BASE_URL") ?? "https://api.dify.ai/v1").TrimEnd('/');
+
+        string provider;
+        if (!string.IsNullOrWhiteSpace(difyKey))
+            provider = "dify";
+        else if (!string.IsNullOrWhiteSpace(openAiKey))
+            provider = "openai";
+        else if (!string.IsNullOrWhiteSpace(qwenKey))
+            provider = "qwen";
+        else
+            provider = "";
+
         if (provider.Length == 0)
-            return StatusCode(412, new { error = "No LLM configured. Set OMNI_OPENAI_API_KEY or OMNI_QWEN_API_KEY in Settings." });
+            return StatusCode(412, new { error = "No LLM configured. Set OMNI_DIFY_API_KEY, or OMNI_OPENAI_API_KEY, or OMNI_QWEN_API_KEY in Settings." });
 
         var systemPrompt = new StringBuilder();
         systemPrompt.Append("You are OmniVisionX, an assistant for a real-time traffic camera monitoring system. ");
@@ -55,6 +68,31 @@ public sealed class CameraChatController : ControllerBase
             }
         }
 
+        var exaKey = _env.Get("OMNI_EXA_API_KEY");
+        var useExa = request.UseExaGrounding != false
+            && !string.IsNullOrWhiteSpace(exaKey)
+            && message.Length > 0;
+        var exaUsed = false;
+        if (useExa)
+        {
+            var grounding = await TryExaGroundingAsync(exaKey!, message, ct);
+            if (grounding is not null)
+            {
+                exaUsed = true;
+                systemPrompt.Append("\n\nWeb grounding (Exa search — verify against camera snapshot when they conflict):\n");
+                systemPrompt.Append(grounding);
+            }
+        }
+
+        if (provider == "dify")
+        {
+            var difyQuery = systemPrompt + "\n\nUser question: " + message;
+            var reply = await CallDifyChatAsync(difyBase, difyKey!, difyQuery, ct);
+            if (reply.Error != null)
+                return StatusCode(reply.StatusCode ?? 502, new { error = reply.Error });
+            return Ok(new ChatResponse("dify", "dify-chat", reply.Text ?? "", exaUsed));
+        }
+
         var endpoint = provider == "openai"
             ? "https://api.openai.com/v1/chat/completions"
             : $"{qwenBase.TrimEnd('/')}/chat/completions";
@@ -63,7 +101,7 @@ public sealed class CameraChatController : ControllerBase
         var apiKey = provider == "openai" ? openAiKey! : qwenKey!;
 
         using var client = _httpFactory.CreateClient();
-        client.Timeout = TimeSpan.FromSeconds(30);
+        client.Timeout = TimeSpan.FromSeconds(60);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
         var body = new
@@ -83,8 +121,120 @@ public sealed class CameraChatController : ControllerBase
         if (!resp.IsSuccessStatusCode)
             return StatusCode((int)resp.StatusCode, new { error = text.Length > 500 ? text[..500] : text });
 
-        var reply = ExtractChatReply(text) ?? "";
-        return Ok(new ChatResponse(provider, model, reply));
+        var replyText = ExtractChatReply(text) ?? "";
+        return Ok(new ChatResponse(provider, model, replyText, exaUsed));
+    }
+
+    private async Task<string?> TryExaGroundingAsync(string apiKey, string userMessage, CancellationToken ct)
+    {
+        try
+        {
+            using var client = _httpFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(25);
+
+            var payload = new
+            {
+                query = userMessage,
+                type = "auto",
+                numResults = 4,
+                contents = new { text = true },
+            };
+            var json = JsonSerializer.Serialize(payload);
+            using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.exa.ai/search")
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json"),
+            };
+            req.Headers.TryAddWithoutValidation("x-api-key", apiKey);
+
+            using var resp = await client.SendAsync(req, ct);
+            var raw = await resp.Content.ReadAsStringAsync(ct);
+            if (!resp.IsSuccessStatusCode)
+                return null;
+
+            return SummarizeExaSearchResults(raw);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? SummarizeExaSearchResults(string rawJson)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(rawJson);
+            if (!doc.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
+                return null;
+            var sb = new StringBuilder();
+            var i = 0;
+            foreach (var r in results.EnumerateArray())
+            {
+                if (i >= 4) break;
+                var title = r.TryGetProperty("title", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : "";
+                var url = r.TryGetProperty("url", out var u) && u.ValueKind == JsonValueKind.String ? u.GetString() : "";
+                string? snippet = null;
+                if (r.TryGetProperty("text", out var tx) && tx.ValueKind == JsonValueKind.String)
+                    snippet = tx.GetString();
+                else if (r.TryGetProperty("highlights", out var hi) && hi.ValueKind == JsonValueKind.Array && hi.GetArrayLength() > 0)
+                    snippet = hi[0].GetString();
+
+                if (!string.IsNullOrWhiteSpace(title) || !string.IsNullOrWhiteSpace(snippet))
+                {
+                    sb.Append(i + 1).Append(". ");
+                    if (!string.IsNullOrWhiteSpace(title))
+                        sb.Append(title).Append(" — ");
+                    if (!string.IsNullOrWhiteSpace(url))
+                        sb.Append(url).Append('\n');
+                    if (!string.IsNullOrWhiteSpace(snippet))
+                    {
+                        var s = snippet.Length > 400 ? snippet[..400] + "…" : snippet;
+                        sb.Append(s).Append("\n\n");
+                    }
+                }
+                i++;
+            }
+            var s2 = sb.ToString().Trim();
+            return s2.Length > 0 ? s2 : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static async Task<(string? Text, string? Error, int? StatusCode)> CallDifyChatAsync(
+        string baseV1, string apiKey, string query, CancellationToken ct)
+    {
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+            var body = new
+            {
+                inputs = new Dictionary<string, object>(),
+                query,
+                response_mode = "blocking",
+                user = "omnivision-chat",
+            };
+            var json = JsonSerializer.Serialize(body);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var resp = await client.PostAsync($"{baseV1}/chat-messages", content, ct);
+            var text = await resp.Content.ReadAsStringAsync(ct);
+            if (!resp.IsSuccessStatusCode)
+                return (null, text.Length > 600 ? text[..600] : text, (int)resp.StatusCode);
+
+            using var doc = JsonDocument.Parse(text);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("answer", out var ans) && ans.ValueKind == JsonValueKind.String)
+                return (ans.GetString(), null, null);
+            return (null, "Dify response missing answer field", 502);
+        }
+        catch (Exception ex)
+        {
+            return (null, ex.Message, 502);
+        }
     }
 
     private async Task<string?> TryFetchLatestDetectionsAsync(string cameraId, CancellationToken ct)
@@ -135,6 +285,11 @@ public sealed class CameraChatController : ControllerBase
 
         [JsonPropertyName("cameraId")]
         public string? CameraId { get; set; }
+
+        /// <summary>When false, skip Exa web search even if OMNI_EXA_API_KEY is set.</summary>
+        [JsonPropertyName("useExaGrounding")]
+        public bool? UseExaGrounding { get; set; }
     }
-    public sealed record ChatResponse(string Provider, string Model, string Reply);
+
+    public sealed record ChatResponse(string Provider, string Model, string Reply, bool ExaUsed = false);
 }

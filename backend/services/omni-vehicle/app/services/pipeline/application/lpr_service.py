@@ -131,6 +131,7 @@ class OCRService:
         # Instance-level voting buffer (not class-level to avoid shared state)
         self._voting_buffer: Dict[int, List[Dict]] = {}
         self._last_cleanup_time: float = 0.0
+        self._provider: str | None = None
 
     @property
     def CONFIDENCE_THRESHOLD(self) -> float:
@@ -171,6 +172,23 @@ class OCRService:
             return self._external_model
 
         if self._ocr_model is None:
+            provider = os.environ.get("OCR_PROVIDER", "").strip().lower()
+            if not provider:
+                provider = "paddle"
+            self._provider = provider
+
+            if provider == "easyocr":
+                try:
+                    import torch
+                    import easyocr
+                    use_gpu = torch.cuda.is_available()
+                    self._ocr_model = easyocr.Reader(["en"], gpu=use_gpu)
+                    logger.info("✅ EasyOCR initialized (%s)", "GPU" if use_gpu else "CPU")
+                except Exception as exc:
+                    logger.error("Failed to init EasyOCR: %s", exc)
+                    self._ocr_model = None
+                return self._ocr_model
+
             if PaddleOCR is None:
                 logger.error("PaddleOCR not installed!")
                 raise RuntimeError("PaddleOCR not installed")
@@ -448,6 +466,23 @@ class OCRService:
             return None
 
         model = self._get_model()
+        if model is None:
+            return None
+
+        if (self._provider or "paddle").lower() == "easyocr":
+            try:
+                result = model.readtext(img_np, detail=1, paragraph=False)
+            except Exception as e:
+                logger.error("EasyOCR failed: %s", e)
+                return None
+
+            if not result:
+                return None
+            best = max(result, key=lambda x: float(x[2]) if len(x) > 2 else 0.0)
+            if len(best) < 3:
+                return None
+            box, text, score = best[0], str(best[1]), float(best[2])
+            return text, score, box
 
         try:
             # PaddleOCR 2.x stable API: ocr()

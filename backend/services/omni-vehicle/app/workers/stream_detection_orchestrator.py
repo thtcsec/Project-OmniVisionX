@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
@@ -120,6 +121,11 @@ class LprDetectionOrchestrator:
         vehicle_bbox: tuple,
         camera_id: str = "unknown",
     ) -> list[dict]:
+        enabled_env = os.getenv("ENABLE_FORTRESS_LPR", "").strip().lower()
+        if enabled_env in {"0", "false", "no"}:
+            return []
+        if not bool(getattr(self.settings, "enable_fortress_lpr", True)):
+            return []
         self._bump("fortress_attempts")
         try:
             from app.services.core.ambient_adapter import AmbientAdapter

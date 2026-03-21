@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Configuration;
 using Omni.API.Hubs;
 using StackExchange.Redis;
 
@@ -19,16 +20,27 @@ public class OmniEventConsumerService : BackgroundService
     private readonly RedisService _redis;
     private readonly IHubContext<OmniHub> _hubContext;
 
-    private readonly string[] _streamKeys = { "omni:detections", "omni:vehicles", "omni:humans" };
+    private readonly string[] _streamKeys;
 
     public OmniEventConsumerService(
         ILogger<OmniEventConsumerService> logger,
         RedisService redis,
-        IHubContext<OmniHub> hubContext)
+        IHubContext<OmniHub> hubContext,
+        IConfiguration configuration)
     {
         _logger = logger;
         _redis = redis;
         _hubContext = hubContext;
+        var prefix = (configuration["Omni:RedisStreamPrefix"] ?? "omni").Trim();
+        if (string.IsNullOrEmpty(prefix))
+            prefix = "omni";
+        _streamKeys = new[]
+        {
+            $"{prefix}:detections",
+            $"{prefix}:vehicles",
+            $"{prefix}:humans",
+        };
+        _logger.LogInformation("OmniEventConsumerService stream prefix: {Prefix}", prefix);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

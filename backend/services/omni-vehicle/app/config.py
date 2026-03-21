@@ -85,6 +85,47 @@ class Settings(BaseSettings):
         json_schema_extra=_INFRA,
     )
 
+    s3_enabled: bool = Field(
+        default=False,
+        description="Bật upload ảnh event/plate lên MinIO (S3-compatible).",
+        json_schema_extra=_INFRA,
+    )
+    s3_internal_endpoint: str = Field(
+        default="omni-minio:9000",
+        description="Endpoint nội bộ (container→MinIO) dạng host:port.",
+        json_schema_extra=_INFRA,
+    )
+    s3_public_endpoint: str = Field(
+        default="localhost:9000",
+        description="Endpoint public (browser) dạng host:port để tạo presigned URL.",
+        json_schema_extra=_INFRA,
+    )
+    s3_access_key: str = Field(
+        default="admin",
+        description="Access key MinIO (S3).",
+        json_schema_extra=_INFRA,
+    )
+    s3_secret_key: str = Field(
+        default="change_this_minio_secret",
+        description="Secret key MinIO (S3).",
+        json_schema_extra=_INFRA,
+    )
+    s3_bucket: str = Field(
+        default="events",
+        description="Bucket để lưu ảnh event.",
+        json_schema_extra=_INFRA,
+    )
+    s3_secure: bool = Field(
+        default=False,
+        description="Dùng HTTPS cho MinIO endpoint.",
+        json_schema_extra=_INFRA,
+    )
+    s3_prefix: str = Field(
+        default="",
+        description="Prefix object key trong bucket (tuỳ chọn).",
+        json_schema_extra=_INFRA,
+    )
+
     # ── YOLO parity (tier: live) ──────────────────────────────
     yolo_model: str = Field(
         default="yolov11m.pt",
@@ -160,6 +201,11 @@ class Settings(BaseSettings):
         default=True,
         description="Bật/tắt pipeline Fortress LPR (STN-LPRNet). Tắt = dùng legacy PaddleOCR.",
         json_schema_extra=_LIVE,
+    )
+    enable_paddleocr: bool = Field(
+        default=False,
+        description="Bật/tắt PaddleOCR (legacy). Tắt để tránh crash trên CPU không hỗ trợ AVX.",
+        json_schema_extra=_INFRA,
     )
 
     # ── GPU & Batch Tuning (tier: restart) ────────────────────

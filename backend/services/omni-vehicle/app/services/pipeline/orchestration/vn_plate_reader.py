@@ -200,20 +200,15 @@ def get_lp_detector():
         return None
     
     logger.info(f"🔧 Loading plate detector: {model_path} on device={device}")
-    
-    def _looks_like_legacy(path: str) -> bool:
-        name = os.path.basename(path).lower()
-        return "lp_detector" in name or "yolov5" in name
 
-    # Try YOLOv8/v11 format first (ultralytics native) unless legacy
+    # Try ultralytics loader first (supports YOLOv5/YOLOv8/YOLOv11 weights when deps are present)
     try:
-        if not _looks_like_legacy(model_path):
-            os.environ.setdefault("YOLO_AUTOINSTALL", "0")
-            from ultralytics import YOLO
-            _lp_detector = YOLO(model_path)
-            _lp_detector.conf = conf_threshold
-            logger.info(f"✅ Plate detector loaded (YOLOv8): {model_path} (conf={conf_threshold}, device={device})")
-            return _lp_detector
+        os.environ.setdefault("YOLO_AUTOINSTALL", "0")
+        from ultralytics import YOLO
+        _lp_detector = YOLO(model_path)
+        _lp_detector.conf = conf_threshold
+        logger.info(f"✅ Plate detector loaded (ultralytics): {model_path} (conf={conf_threshold}, device={device})")
+        return _lp_detector
     except Exception as e:
         err = str(e)
         if "models.yolo" in err or "models.common" in err or "AutoInstall" in err:

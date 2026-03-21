@@ -396,13 +396,10 @@ async def _process_frame(
             logger.exception("Legacy core pipeline failed, fallback to default: %s", exc)
 
     loader = ModelLoader.get_instance()
-    detector, paddle_ocr = loader.get_models()
+    detector, _ = loader.get_models()
 
     if detector is None:
         logger.warning("LP_detector not loaded — cannot process frame")
-        return []  # Return empty instead of HTTPException (called from non-HTTP contexts too)
-    if paddle_ocr is None:
-        logger.warning("PaddleOCR not loaded — cannot process frame")
         return []  # Return empty instead of HTTPException (called from non-HTTP contexts too)
 
     plates: List[PlateResult] = []
@@ -719,6 +716,82 @@ async def health_check():
         "training_worker": _training_worker is not None,
         "stream_consumer": stream_ok,
         "stream_metrics": _stream_consumer.get_metrics_snapshot() if _stream_consumer else None,
+    }
+
+
+class DebugEmitRequest(BaseModel):
+    camera_id: str
+    plate_text: str = "DEBUG-PLATE"
+
+
+@app.post("/vehicle/debug/emit-plate-event")
+async def debug_emit_plate_event(req: DebugEmitRequest):
+    from sqlalchemy import text
+    from app.workers.stream_thumbnail_service import LprThumbnailService
+
+    camera_id = req.camera_id.strip()
+    if not camera_id:
+        raise HTTPException(status_code=400, detail="camera_id required")
+
+    settings = get_settings()
+    async with _event_repo._engine.connect() as conn:
+        row = (await conn.execute(text('SELECT "StreamUrl" FROM "Cameras" WHERE "Id" = :id LIMIT 1'), {"id": camera_id})).first()
+    if not row or not row[0]:
+        raise HTTPException(status_code=404, detail="camera not found or no streamUrl")
+
+    stream_url = str(row[0])
+    cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
+    try:
+        ok, frame = cap.read()
+    finally:
+        cap.release()
+    if not ok or frame is None:
+        raise HTTPException(status_code=502, detail="failed to capture frame")
+
+    h, w = frame.shape[:2]
+    vx1, vy1 = int(w * 0.55), int(h * 0.35)
+    vx2, vy2 = int(w * 0.95), int(h * 0.95)
+    px1, py1 = int(w * 0.70), int(h * 0.75)
+    px2, py2 = int(w * 0.86), int(h * 0.86)
+    plate_crop = frame[py1:py2, px1:px2].copy() if py2 > py1 and px2 > px1 else None
+
+    thumb = LprThumbnailService(settings)
+    plate_ref, frame_ref = thumb.save_thumbnails(
+        full_frame=frame,
+        plate_crop=plate_crop,
+        camera_id=camera_id,
+        plate_text=req.plate_text,
+        plate_bbox=(px1, py1, px2, py2),
+        vehicle_bbox=(vx1, vy1, vx2, vy2),
+        vehicle_type="motorcycle",
+        vehicle_color="unknown",
+    )
+
+    evt_id = uuid.uuid4()
+    plate_id = uuid.uuid4()
+    await _event_repo.save_plate_event(
+        event_id=evt_id,
+        plate_id=plate_id,
+        camera_id=camera_id,
+        plate_number=req.plate_text,
+        vehicle_type="motorcycle",
+        confidence=0.99,
+        thumbnail_filename=plate_ref,
+        full_frame_filename=frame_ref,
+        bbox=[px1, py1, px2, py2],
+        tracking_id=None,
+        is_update=False,
+        metadata={"source": "debug"},
+        color=None,
+    )
+
+    return {
+        "event_id": str(evt_id),
+        "plate_id": str(plate_id),
+        "camera_id": camera_id,
+        "plate_text": req.plate_text,
+        "plate_image_url": plate_ref,
+        "frame_image_url": frame_ref,
     }
 
 

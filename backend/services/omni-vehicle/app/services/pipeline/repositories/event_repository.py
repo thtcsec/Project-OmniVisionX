@@ -31,6 +31,8 @@ class PlateEventRepository:
             pool_pre_ping=True,
         )
         self._settings = settings
+        self._schema_ready = False
+        self._schema_lock = threading.Lock()
 
     @classmethod
     def get_instance(cls) -> "PlateEventRepository":
@@ -71,6 +73,7 @@ class PlateEventRepository:
             vehicle_type = normalize_vehicle_type(vehicle_type, plate_number)
 
             async with self._engine.begin() as conn:
+                await self._ensure_schema(conn)
                 bbox_json = json.dumps({
                     "coords": bbox,
                     "space": "full_frame",
@@ -114,62 +117,48 @@ class PlateEventRepository:
 
                 else:
                     ts = datetime.utcnow()
-                    try:
-                        cam_uuid = uuid.UUID(camera_id)
-                    except (ValueError, AttributeError):
-                        cam_uuid = None
-                        logger.warning("Non-UUID camera_id '%s' — dedup skipped, this may cause duplicates", camera_id)
+                    dedup_seconds = float(self._settings.event_dedup_ttl)
+                    cutoff = ts - timedelta(seconds=dedup_seconds)
 
-                    if cam_uuid is not None:
-                        dedup_seconds = float(self._settings.event_dedup_ttl)
-                        cutoff = ts - timedelta(seconds=dedup_seconds)
-                        
-                        # 1. Exact match check (fast path)
-                        existing = await conn.execute(text("""
-                            SELECT 1
+                    existing = await conn.execute(text("""
+                        SELECT 1
+                        FROM "PlateRecords"
+                        WHERE "CameraId" = :cam_id
+                          AND "PlateNumber" = :plate
+                          AND "Timestamp" > :cutoff
+                          AND "IsDeleted" = FALSE
+                        LIMIT 1
+                    """), {
+                        "cam_id": camera_id,
+                        "plate": plate_number,
+                        "cutoff": cutoff,
+                    })
+                    if existing.first() is not None:
+                        return
+
+                    if len(plate_number) >= 5:
+                        prefix3 = plate_number[:3]
+                        similar = await conn.execute(text("""
+                            SELECT "PlateNumber"
                             FROM "PlateRecords"
                             WHERE "CameraId" = :cam_id
-                              AND "PlateNumber" = :plate
+                              AND "PlateNumber" LIKE :prefix
+                              AND LENGTH("PlateNumber") BETWEEN :min_len AND :max_len
                               AND "Timestamp" > :cutoff
                               AND "IsDeleted" = FALSE
-                            LIMIT 1
+                            LIMIT 5
                         """), {
-                            "cam_id": cam_uuid,
-                            "plate": plate_number,
+                            "cam_id": camera_id,
+                            "prefix": prefix3 + "%",
+                            "min_len": len(plate_number) - 1,
+                            "max_len": len(plate_number) + 1,
                             "cutoff": cutoff,
                         })
-                        if existing.first() is not None:
-                            return
-                        
-                        # 2. Fuzzy match: prefix similarity check for OCR jitter
-                        #    Same camera + similar plate (shares first 3 chars + similar length)
-                        #    Catches OCR jitter: 65A03977 vs 65A33977
-                        if len(plate_number) >= 5:
-                            prefix3 = plate_number[:3]  # e.g., "65A"
-                            similar = await conn.execute(text("""
-                                SELECT "PlateNumber"
-                                FROM "PlateRecords"
-                                WHERE "CameraId" = :cam_id
-                                  AND "PlateNumber" LIKE :prefix
-                                  AND LENGTH("PlateNumber") BETWEEN :min_len AND :max_len
-                                  AND "Timestamp" > :cutoff
-                                  AND "IsDeleted" = FALSE
-                                LIMIT 5
-                            """), {
-                                "cam_id": cam_uuid,
-                                "prefix": prefix3 + "%",
-                                "min_len": len(plate_number) - 1,
-                                "max_len": len(plate_number) + 1,
-                                "cutoff": cutoff,
-                            })
-                            for row in similar:
-                                existing_plate = row[0]
-                                if fuzzy_plate_match(plate_number, existing_plate):
-                                    logger.debug(
-                                        "Fuzzy dedup: '%s' ≈ existing '%s'",
-                                        plate_number, existing_plate
-                                    )
-                                    return
+                        for row in similar:
+                            existing_plate = row[0]
+                            if fuzzy_plate_match(plate_number, existing_plate):
+                                logger.debug("Fuzzy dedup: '%s' ≈ existing '%s'", plate_number, existing_plate)
+                                return
 
                     await conn.execute(text("""
                         INSERT INTO "PlateRecords" (
@@ -190,7 +179,7 @@ class PlateEventRepository:
                         "id": plate_id,
                         "plate": plate_number,
                         "ts": ts,
-                        "cam_id": cam_uuid,
+                        "cam_id": camera_id,
                         "thumb": thumbnail_filename,
                         "full_frame": full_frame_filename,
                         "type": vehicle_type,
@@ -212,7 +201,7 @@ class PlateEventRepository:
                         )
                     """), {
                         "id": event_id,
-                        "cam_id": cam_uuid,
+                        "cam_id": camera_id,
                         "ts": ts,
                         "thumb": thumbnail_filename,
                         "desc": f"Phát hiện xe {vehicle_type} - {plate_number}",
@@ -223,3 +212,47 @@ class PlateEventRepository:
         except Exception:
             logger.exception("DB Save Error")
             raise  # Let callers know the write failed (prevents phantom cache entries)
+
+    async def _ensure_schema(self, conn) -> None:
+        if self._schema_ready:
+            return
+        with self._schema_lock:
+            if self._schema_ready:
+                return
+            self._schema_ready = True
+
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS "PlateRecords" (
+                "Id" uuid PRIMARY KEY,
+                "PlateNumber" text NOT NULL,
+                "Timestamp" timestamptz NOT NULL,
+                "CameraId" text NOT NULL,
+                "ThumbnailPath" text NULL,
+                "FullFramePath" text NULL,
+                "Confidence" real NOT NULL DEFAULT 0,
+                "BoundingBox" text NULL,
+                "VehicleType" text NOT NULL DEFAULT 'unknown',
+                "Color" text NULL,
+                "TrackingId" text NULL,
+                "Direction" text NULL,
+                "IsDeleted" boolean NOT NULL DEFAULT false
+            );
+        """))
+        await conn.execute(text("""ALTER TABLE "PlateRecords" ADD COLUMN IF NOT EXISTS "TrackingId" text NULL;"""))
+        await conn.execute(text("""CREATE INDEX IF NOT EXISTS "IX_PlateRecords_Timestamp" ON "PlateRecords" ("Timestamp");"""))
+        await conn.execute(text("""CREATE INDEX IF NOT EXISTS "IX_PlateRecords_PlateNumber" ON "PlateRecords" ("PlateNumber");"""))
+
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS "Events" (
+                "Id" uuid PRIMARY KEY,
+                "Type" text NOT NULL,
+                "CameraId" text NULL,
+                "Timestamp" timestamptz NOT NULL,
+                "ThumbnailPath" text NULL,
+                "Description" text NULL,
+                "PlateRecordId" uuid NULL,
+                "Metadata" text NULL,
+                "IsDeleted" boolean NOT NULL DEFAULT false
+            );
+        """))
+        await conn.execute(text("""CREATE INDEX IF NOT EXISTS "IX_Events_Timestamp" ON "Events" ("Timestamp");"""))

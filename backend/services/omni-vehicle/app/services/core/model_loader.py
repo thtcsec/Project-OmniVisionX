@@ -114,6 +114,12 @@ class ModelLoader:
 
             # Load PaddleOCR
             try:
+                if not bool(getattr(get_settings(), "enable_paddleocr", False)):
+                    self._ocr = None
+                    logger.info("ℹ️ PaddleOCR disabled by settings")
+                    self._touch()
+                    return self._detector, self._ocr
+
                 os.environ["FLAGS_log_level"] = "3"
                 os.environ["GLOG_minloglevel"] = "3"
                 from paddleocr import PaddleOCR
@@ -176,7 +182,8 @@ class ModelLoader:
                 logger.warning("PaddleOCR warmup failed: %s", exc)
 
     def get_models(self) -> Tuple[object, object]:
-        if self._detector is None or self._ocr is None:
+        require_ocr = bool(getattr(get_settings(), "enable_paddleocr", False))
+        if self._detector is None or (require_ocr and self._ocr is None):
             return self.load()
         self._touch()
         return self._detector, self._ocr

@@ -183,7 +183,7 @@ class DahuaSDKManager:
                 result = await conn.execute(text('''
                     SELECT "Id", "StreamUrl", "Name"
                     FROM "Cameras"
-                    WHERE "Status" = 'Online' AND "StreamUrl" IS NOT NULL
+                    WHERE LOWER(TRIM("Status")) = 'online' AND "StreamUrl" IS NOT NULL
                 '''))
                 rows = result.fetchall()
 

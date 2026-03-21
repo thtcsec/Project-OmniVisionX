@@ -16,6 +16,7 @@ torch>=2.0.0
 torchvision>=0.15.0
 
 # OCR
+easyocr==1.7.1
 paddlepaddle==2.6.2
 paddleocr==2.7.0.3
 
@@ -25,6 +26,8 @@ pydantic-settings==2.2.1
 python-dotenv==1.0.0
 httpx==0.26.0
 aiofiles==23.2.1
+minio==7.2.15
+setuptools==69.5.1
 
 # Database
 asyncpg==0.29.0
@@ -35,6 +38,7 @@ redis[hiredis]>=5.0.0
 
 # YOLOv5 dependencies
 gitpython>=3.1.30
+yolov5==7.0.14
 
 # YOLOv11 (Fortress)
 ultralytics==8.3.0

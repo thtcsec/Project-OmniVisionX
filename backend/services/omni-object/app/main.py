@@ -292,16 +292,11 @@ async def _get_active_cameras(engine) -> Optional[Dict[str, str]]:
     """
     settings = get_settings()
     query = text("""
-                                SELECT "Id"::text, "StreamUrl", "Username", "Password"
+                                SELECT "Id"::text, "StreamUrl"
                 FROM "Cameras"
-                WHERE "Status" = 'Online'
+                WHERE LOWER(TRIM("Status")) = 'online'
                   AND "StreamUrl" IS NOT NULL
                   AND "StreamUrl" != ''
-                  AND (
-                    "EnableObjectDetection" = TRUE
-                    OR "EnablePlateOcr" = TRUE
-                    OR "EnableFaceRecognition" = TRUE
-                  )
             """)
 
     max_attempts = max(0, int(settings.camera_query_retries))
@@ -314,8 +309,8 @@ async def _get_active_cameras(engine) -> Optional[Dict[str, str]]:
                     timeout=float(settings.camera_query_timeout_s),
                 )
                 for row in result:
-                    cam_id, rtsp_url, username, password = row
-                    raw_cameras[cam_id] = _build_authenticated_rtsp_url(rtsp_url, username, password)
+                    cam_id, rtsp_url = row
+                    raw_cameras[cam_id] = _build_authenticated_rtsp_url(rtsp_url, None, None)
 
             if not settings.use_mediamtx_relay or not raw_cameras:
                 return raw_cameras

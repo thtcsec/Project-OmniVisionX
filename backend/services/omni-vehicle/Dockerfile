@@ -33,7 +33,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Upgrade pip (cached)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip setuptools wheel
+    pip install --upgrade pip wheel && pip install "setuptools==69.5.1"
 
 # Install PyTorch with CUDA (cached - large download)
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu124
