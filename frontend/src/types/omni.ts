@@ -32,6 +32,9 @@ export interface Detection {
   bbox?: { x: number; y: number; w: number; h: number };
   timestamp: string;
   metadata?: Record<string, unknown>;
+  /** Redis stream source: detections | vehicles */
+  source?: string;
+  trackId?: number;
 }
 
 export interface PlateResult {

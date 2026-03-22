@@ -20,6 +20,24 @@ public class RedisService
 
     public IDatabase GetDatabase() => _db;
 
+    /// <summary>Newest-first slice of a Redis stream (XREVRANGE … COUNT).</summary>
+    public async Task<StreamEntry[]> StreamRevRangeAsync(RedisKey key, int count)
+    {
+        if (count <= 0)
+            return Array.Empty<StreamEntry>();
+        try
+        {
+            var len = await _db.StreamLengthAsync(key);
+            if (len == 0)
+                return Array.Empty<StreamEntry>();
+            return await _db.StreamRangeAsync(key, "-", "+", count, Order.Descending);
+        }
+        catch (RedisException)
+        {
+            return Array.Empty<StreamEntry>();
+        }
+    }
+
     public async Task<StreamEntry[]> StreamReadAsync(string key, string group, int count = 100)
     {
         var entries = await _db.StreamReadGroupAsync(key, group, "consumer", count);
