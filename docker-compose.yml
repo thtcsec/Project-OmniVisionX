@@ -120,6 +120,7 @@ services:
     restart: unless-stopped
     environment:
       - OMNI_SIMULATOR_AUTOSTART=${OMNI_SIMULATOR_AUTOSTART:-false}
+      - OMNI_SIMULATOR_CORS_ORIGINS=${OMNI_SIMULATOR_CORS_ORIGINS:-}
     ports:
       - "${SIMULATOR_PORT:-8554}:8554"  # HTTP API
     volumes:

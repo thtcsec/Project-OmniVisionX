@@ -172,6 +172,17 @@ export const fetchLatestDetectionsSnapshot = (cameraIds: string) =>
     `${API_BASE}/api/live/detections/latest?cameraIds=${encodeURIComponent(cameraIds)}`,
   );
 
+export type LiveIngestStatus = {
+  reachable: boolean;
+  healthOk?: boolean;
+  ingestCameraIds?: string[];
+  detail?: string;
+};
+
+/** omni-object capture pool — explains missing bbox when empty or camera id not listed */
+export const fetchLiveIngestStatus = () =>
+  request<LiveIngestStatus>(`${API_BASE}/api/live/ingest-status`);
+
 // Detections
 export const fetchDetections = (params?: { cameraId?: string; from?: string; to?: string }) => {
   const q = new URLSearchParams();

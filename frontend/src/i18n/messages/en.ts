@@ -55,7 +55,19 @@ export const en = {
     signalRReconnecting: "SignalR: reconnecting…",
     signalRDisconnected: "SignalR: disconnected",
     pipelineHint:
-      "Overlays: SignalR (Redis→API) + HTTP snapshot from omni-object (same camera id). If boxes are missing, check omni-object + API `OmniObject:BaseUrl` / Redis stream prefix `omni:*`.",
+      "Bounding boxes need omni-object (YOLO) ingesting your RTSP; plate OCR also needs omni-vehicle. Both are in the Compose `gpu` profile. Redis/SignalR uses prefix `omni:*`.",
+    cameraOfflineTitle: "Camera is offline in the database",
+    cameraOfflineBody:
+      "The detector only pulls cameras with Status = Online and a valid stream URL. Open Cameras, set this camera to Online and save.",
+    ingestObjectDownTitle: "Object detector (omni-object) is not reachable",
+    ingestObjectDownBody:
+      "Start the GPU stack so RTSP inference runs: docker compose --profile gpu up -d (needs omni-object; add omni-vehicle for plate OCR).",
+    ingestCameraMissingTitle: "This camera ID is not in the detector capture pool",
+    ingestCameraMissingBody:
+      "The API sees omni-object, but this camera is not ingesting yet. Confirm RTSP works from the container network, Status = Online, and wait ~30s for the DB sync loop.",
+    ingestPoolEmptyTitle: "Detector capture pool is empty",
+    ingestPoolEmptyBody:
+      "omni-object is up but has no active RTSP readers. Check cameras are Online in the DB, stream URLs are valid, and watch omni-object logs for FFmpeg/OpenCV errors.",
     snapshotOk: "HTTP snapshot",
     snapshotError: "HTTP snapshot failed",
     overlayOffHint: "Tracking overlays are OFF — turn the switch on to draw boxes.",

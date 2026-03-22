@@ -82,12 +82,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_DEFAULT_CORS = (
+    "http://localhost:3000,http://127.0.0.1:3000,"
+    "http://localhost:3002,http://127.0.0.1:3002,"
+    "http://localhost:5173,http://127.0.0.1:5173"
+)
+_cors_raw = os.getenv("OMNI_SIMULATOR_CORS_ORIGINS", "").strip()
 _cors_origins = [
     origin.strip()
-    for origin in os.getenv(
-        "OMNI_SIMULATOR_CORS_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
-    ).split(",")
+    for origin in (_cors_raw or _DEFAULT_CORS).split(",")
     if origin.strip()
 ]
 

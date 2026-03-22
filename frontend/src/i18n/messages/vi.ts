@@ -57,7 +57,19 @@ export const vi: MessageTree = {
     signalRReconnecting: "SignalR: đang kết nối lại…",
     signalRDisconnected: "SignalR: mất kết nối",
     pipelineHint:
-      "Overlay: SignalR (Redis→API) + HTTP snapshot từ omni-object (cùng camera id). Không thấy khung: kiểm tra omni-object + API `OmniObject:BaseUrl` / tiền tố Redis `omni:*`.",
+      "Khung bbox cần omni-object (YOLO) đang đọc RTSP; OCR biển số cần thêm omni-vehicle. Cả hai nằm trong profile `gpu` của Docker Compose. SignalR/Redis dùng tiền tố `omni:*`.",
+    cameraOfflineTitle: "Camera đang Offline trong database",
+    cameraOfflineBody:
+      "Detector chỉ kéo camera có Status = Online và URL stream hợp lệ. Vào Cameras, chuyển Online và lưu.",
+    ingestObjectDownTitle: "Không kết nối được omni-object (object detector)",
+    ingestObjectDownBody:
+      "Chạy stack GPU để inference RTSP: docker compose --profile gpu up -d (cần omni-object; thêm omni-vehicle cho OCR biển số).",
+    ingestCameraMissingTitle: "Camera này chưa có trong capture pool của detector",
+    ingestCameraMissingBody:
+      "API thấy omni-object nhưng camera chưa được ingest. Kiểm tra RTSP từ mạng container, Status = Online, đợi ~30s cho vòng sync DB.",
+    ingestPoolEmptyTitle: "Capture pool của detector đang trống",
+    ingestPoolEmptyBody:
+      "omni-object chạy nhưng chưa có RTSP nào. Kiểm tra camera Online trong DB, URL stream, log omni-object (FFmpeg/OpenCV).",
     snapshotOk: "HTTP snapshot",
     snapshotError: "HTTP snapshot lỗi",
     overlayOffHint: "Đang TẮT khung tracking — bật công tắc để vẽ khung.",

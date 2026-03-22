@@ -7,6 +7,7 @@ import {
   fetchCamera,
   fetchIntegrationsStatus,
   fetchLatestDetectionsSnapshot,
+  fetchLiveIngestStatus,
   speakText,
   type LatestDetectionsSnapshot,
 } from "@/services/api";
@@ -21,6 +22,7 @@ import { LiveStreamPlayer } from "@/components/LiveStreamPlayer";
 import { AgoraPlayer } from "@/components/AgoraPlayer";
 import { parseBboxFromOmniEvent, type TrackOverlay } from "@/lib/parseOmniBbox";
 import { useI18n } from "@/i18n/I18nProvider";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -111,6 +113,15 @@ export default function LivePreview() {
     queryFn: fetchIntegrationsStatus,
     staleTime: 60_000,
     retry: false,
+  });
+
+  const ingestStatusQuery = useQuery({
+    queryKey: ["live-ingest-status"],
+    queryFn: fetchLiveIngestStatus,
+    enabled: !!cameraId && cameraId !== CAMERA_NONE,
+    staleTime: 5_000,
+    refetchInterval: 8_000,
+    retry: 1,
   });
 
   const agoraStatusQuery = useQuery({
@@ -426,6 +437,37 @@ export default function LivePreview() {
 
           {cameraId !== CAMERA_NONE && (
             <>
+              {camera?.status === "offline" && (
+                <Alert variant="destructive" className="py-3">
+                  <AlertTitle className="text-sm">{t("live.cameraOfflineTitle")}</AlertTitle>
+                  <AlertDescription className="text-xs">{t("live.cameraOfflineBody")}</AlertDescription>
+                </Alert>
+              )}
+              {ingestStatusQuery.data && ingestStatusQuery.data.reachable === false && (
+                <Alert variant="destructive" className="py-3">
+                  <AlertTitle className="text-sm">{t("live.ingestObjectDownTitle")}</AlertTitle>
+                  <AlertDescription className="text-xs whitespace-pre-wrap">
+                    {t("live.ingestObjectDownBody")}
+                  </AlertDescription>
+                </Alert>
+              )}
+              {ingestStatusQuery.data?.reachable &&
+                camera?.status === "online" &&
+                (ingestStatusQuery.data.ingestCameraIds?.length ?? 0) === 0 && (
+                  <Alert className="border-amber-500/60 py-3">
+                    <AlertTitle className="text-sm">{t("live.ingestPoolEmptyTitle")}</AlertTitle>
+                    <AlertDescription className="text-xs">{t("live.ingestPoolEmptyBody")}</AlertDescription>
+                  </Alert>
+                )}
+              {ingestStatusQuery.data?.reachable &&
+                camera?.status === "online" &&
+                (ingestStatusQuery.data.ingestCameraIds?.length ?? 0) > 0 &&
+                !(ingestStatusQuery.data.ingestCameraIds ?? []).includes(cameraId) && (
+                  <Alert className="border-amber-500/60 py-3">
+                    <AlertTitle className="text-sm">{t("live.ingestCameraMissingTitle")}</AlertTitle>
+                    <AlertDescription className="text-xs">{t("live.ingestCameraMissingBody")}</AlertDescription>
+                  </Alert>
+                )}
               {mjpegUrl && (
                 <p className="text-sm text-emerald-700 dark:text-emerald-400">Server-side overlay stream is active (OMNI_STREAM_URL).</p>
               )}
