@@ -52,6 +52,10 @@ Thumbs.db
 
 .data/
 
+# Local DB/Redis bind mounts (see deploy/README.md)
+deploy/postgres-data/
+deploy/redis-data/
+
 docs/
 canhbao.txt
 bin/

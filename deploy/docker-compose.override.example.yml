@@ -1,0 +1,14 @@
+# Copy this file to the repository ROOT as: docker-compose.override.yml
+# (next to docker-compose.yml). Docker Compose merges it automatically.
+#
+# Creates bind mounts under ./deploy/postgres-data and ./deploy/redis-data
+# (create those folders first). Keeps all paths inside the project tree.
+
+services:
+  omni-db:
+    volumes:
+      - ./deploy/postgres-data:/var/lib/postgresql/data
+
+  omni-bus:
+    volumes:
+      - ./deploy/redis-data:/data
