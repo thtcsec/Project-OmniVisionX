@@ -67,13 +67,15 @@ app.MapHub<OmniHub>("/hubs/omni");
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "OmniAPI", version = "1.0.0" }));
 
-// Ensure database created + patch existing cameras to enable LPR
-using (var scope = app.Services.CreateScope())
+// Ensure database created + patch existing cameras to enable LPR.
+// Do not fail startup if Postgres is down (wrong host, volume, or DB still starting) — log and continue so /health still works.
+try
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<OmniDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     db.Database.EnsureCreated();
 
-    // Enable LPR for existing cameras that have a stream URL but never had EnablePlateOcr set
     var camsToFix = db.Cameras
         .Where(c => !string.IsNullOrEmpty(c.StreamUrl) && !c.EnablePlateOcr)
         .ToList();
@@ -82,9 +84,15 @@ using (var scope = app.Services.CreateScope())
         foreach (var cam in camsToFix)
             cam.EnablePlateOcr = true;
         db.SaveChanges();
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         logger.LogInformation("Patched {Count} camera(s): EnablePlateOcr=true", camsToFix.Count);
     }
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex,
+        "Database startup skipped: cannot connect or EnsureCreated failed. " +
+        "Check ConnectionStrings__DefaultConnection, omni-db health, and compose volume. API will run but DB endpoints may fail.");
 }
 
 app.Run();

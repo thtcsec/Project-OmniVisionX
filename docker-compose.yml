@@ -15,8 +15,10 @@ services:
     environment:
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: omnivision
+    # Named volume works on any host. For a fixed Windows path, use docker-compose.override.yml:
+    # volumes: [ "D:/docker-data/omnivision/postgres:/var/lib/postgresql/data" ]
     volumes:
-      - D:/docker-data/omnivision/postgres:/var/lib/postgresql/data
+      - omni_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -35,7 +37,7 @@ services:
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
-      - D:/docker-data/omnivision/redis:/data
+      - omni_redis_data:/data
     networks:
       - omni-network
 
@@ -291,3 +293,5 @@ networks:
 
 volumes:
   omni_minio_data:
+  omni_postgres_data:
+  omni_redis_data:
