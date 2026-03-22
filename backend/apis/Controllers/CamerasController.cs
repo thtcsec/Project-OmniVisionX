@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using Omni.API.Data;
+using Omni.API.Persistence;
 using Omni.API.Hubs;
 using Omni.API.Models;
 using Omni.API.Services;

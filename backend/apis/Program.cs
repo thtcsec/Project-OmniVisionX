@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Omni.API.Data;
+using Omni.API.Persistence;
 using Omni.API.Hubs;
 using Omni.API.Services;
 

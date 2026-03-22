@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using Omni.API.Data;
+using Omni.API.Persistence;
 using Omni.API.Models;
 
 namespace Omni.API.Controllers;

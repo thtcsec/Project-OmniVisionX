@@ -21,8 +21,8 @@ venv/
 *.swp
 *.swo
 
-# Data volumes (bind mounts)
-data/
+# Data volumes (bind mounts) — repo root only; avoid ignoring backend/**/Data on case-insensitive FS
+/data/
 
 # YOLO weights (keep models/yolo/README + .gitkeep only)
 models/yolo/*.pt

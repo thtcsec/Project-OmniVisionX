@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Omni.API.Data;
+using Omni.API.Persistence;
 using StackExchange.Redis;
 
 namespace Omni.API.Controllers;
