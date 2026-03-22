@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { startConnection, stopConnection, onOmniEvent, onConnectionStatus } from "@/services/signalr";
+import { startConnection, onOmniEvent, onConnectionStatus } from "@/services/signalr";
 import type { OmniEvent } from "@/types/omni";
 
 export type ConnectionStatus = "connected" | "disconnected" | "reconnecting";
@@ -13,11 +13,13 @@ export function useSignalR() {
     const unsubEvent = onOmniEvent((event) => {
       setEvents((prev) => [event, ...prev].slice(0, 100));
     });
-    startConnection();
+    void startConnection();
     return () => {
       unsubStatus();
       unsubEvent();
-      stopConnection();
+      // Do not stopConnection() here — React Strict Mode runs cleanup between mounts and
+      // aborts the hub mid-handshake ("stopped before the hub handshake could complete").
+      // Hub is a process-wide singleton; it can stay up for the SPA session.
     };
   }, []);
 

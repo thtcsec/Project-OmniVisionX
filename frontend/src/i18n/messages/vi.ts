@@ -77,7 +77,8 @@ export const vi: MessageTree = {
     nextPage: "Trang sau",
     pageIndicator: "Trang {page} / {total}",
     chatTitle: "Chat với Camera",
-    chatHint: "Hỏi nhanh về cảnh hiện tại (OpenAI/Qwen).",
+    chatHint:
+      "Hỏi về cảnh. OpenAI / Qwen-VL phân tích cùng JPEG với ảnh nhỏ + dòng detection (kèm OCR). Dify chỉ nhận chữ; ảnh vẫn hiện bên dưới.",
     chatNeedConfig:
       "Chưa cấu hình LLM. Vào Cài đặt → Tích hợp để nhập Dify, OpenAI hoặc Qwen.",
     chatEmpty: "Chưa có tin nhắn.",
@@ -86,6 +87,11 @@ export const vi: MessageTree = {
     chatPlaceholder: "Nhập câu hỏi…",
     chatSend: "Gửi",
     chatSpeak: "Đọc",
+    chatVisionFrame: "Ảnh gửi cho trợ lý (API → snapshot omni-object)",
+    chatDetectionLines: "Detection + OCR (từ snapshot mới nhất)",
+    chatNoDetectionText: "Chưa có dòng structured — bật overlay hoặc chờ omni-object / LPR.",
+    chatAutoSpeak: "Tự đọc câu trả lời",
+    chatAutoSpeakHint: "Phát giọng ElevenLabs khi có câu trả lời (mặc định bật). Vẫn có nút Speak từng tin.",
   },
   about: {
     tagline:

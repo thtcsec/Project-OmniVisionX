@@ -100,13 +100,15 @@ export function LiveStreamPlayer({
           aria-hidden
         >
           {visible.map((t) => {
+            const srcW = t.sourceFrameW && t.sourceFrameW > 0 ? t.sourceFrameW : dims.vw;
+            const srcH = t.sourceFrameH && t.sourceFrameH > 0 ? t.sourceFrameH : dims.vh;
             const m = mapBboxToObjectContainPercent(
               t.x1,
               t.y1,
               t.x2,
               t.y2,
-              dims.vw,
-              dims.vh,
+              srcW,
+              srcH,
               dims.cw,
               dims.ch,
             );

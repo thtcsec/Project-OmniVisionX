@@ -328,6 +328,8 @@ class RedisStreamPublisher:
         timestamp: float,
         frame_bgr: Optional[np.ndarray] = None,
         frame_stream_id: Optional[str] = None,
+        frame_width: int = 0,
+        frame_height: int = 0,
     ):
         """Enqueue detections to be published."""
         if not self._connected or not self._publish_queue:
@@ -336,7 +338,7 @@ class RedisStreamPublisher:
         try:
             self._publish_queue.put_nowait({
                 "type": "detections",
-                "args": (camera_id, detections, frame_jpeg, timestamp, frame_bgr, frame_stream_id)
+                "args": (camera_id, detections, frame_jpeg, timestamp, frame_bgr, frame_stream_id, frame_width, frame_height)
             })
         except asyncio.QueueFull:
             logger.warning("Redis publish queue FULL! Dropping frame for camera %s (Backpressure)", camera_id)
@@ -349,6 +351,8 @@ class RedisStreamPublisher:
         timestamp: float,
         frame_bgr: Optional[np.ndarray] = None,
         frame_stream_id: Optional[str] = None,
+        frame_width: int = 0,
+        frame_height: int = 0,
     ):
         """
         Publish tracked detections + frame to Redis Stream.
@@ -362,6 +366,8 @@ class RedisStreamPublisher:
             "bbox": "x1,y1,x2,y2",
             "confidence": float,
             "timestamp": float,
+            "frame_width": int,   # inference frame size (matches bbox space)
+            "frame_height": int,
             "frame_jpeg": bytes   (only on frame stream, not per-detection)
         }
         """
@@ -383,6 +389,9 @@ class RedisStreamPublisher:
                     b"confidence": f'{det["confidence"]:.3f}'.encode(),
                     b"timestamp": f'{timestamp:.3f}'.encode(),
                 }
+                if frame_width > 0 and frame_height > 0:
+                    entry[b"frame_width"] = str(int(frame_width)).encode()
+                    entry[b"frame_height"] = str(int(frame_height)).encode()
                 # Attach frame_stream_id for exact frame correlation
                 if frame_stream_id:
                     entry[b"frame_stream_id"] = frame_stream_id.encode() if isinstance(frame_stream_id, str) else frame_stream_id

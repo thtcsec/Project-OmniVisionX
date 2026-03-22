@@ -134,6 +134,12 @@ async def _get_latest_plate_overlays(requested_ids: Optional[set[str]]) -> Dict[
         except Exception:
             confidence = 0.0
 
+        plate_txt_raw = payload.get(b"plate_text") or payload.get("plate_text")
+        if isinstance(plate_txt_raw, bytes):
+            plate_text = plate_txt_raw.decode(errors="ignore").strip()
+        else:
+            plate_text = str(plate_txt_raw or "").strip()
+
         timestamp_raw = payload.get(b"timestamp") or payload.get("timestamp")
         try:
             if isinstance(timestamp_raw, bytes):
@@ -156,6 +162,7 @@ async def _get_latest_plate_overlays(requested_ids: Optional[set[str]]) -> Dict[
             "bbox": plate_bbox,
             "timestamp": timestamp,
             "source": "omni-vehicle",
+            "plate_text": plate_text,
         })
         if track_id >= 0:
             track_seen[camera_id].add(track_id)
@@ -685,6 +692,8 @@ async def _detection_loop():
                             timestamp=ts_now,
                             frame_bgr=frame_bgr,
                             frame_stream_id=frame_stream_id,
+                            frame_width=int(frame_w),
+                            frame_height=int(frame_h),
                         )
 
             # Pace the loop
@@ -943,7 +952,8 @@ async def latest_detections(cameraIds: str | None = None):
                 if len(bbox) != 4:
                     continue
                 x1, y1, x2, y2 = [int(v) for v in bbox]
-                normalized.append({
+                pt = str(plate_det.get("plate_text") or "").strip()
+                row = {
                     "track_id": int(plate_det.get("track_id", -1)),
                     "class_name": "plate",
                     "class": "plate",
@@ -956,7 +966,10 @@ async def latest_detections(cameraIds: str | None = None):
                         max(0.0, min(1.0, y2 / frame_h)),
                     ],
                     "source": "omni-vehicle",
-                })
+                }
+                if pt:
+                    row["plate_text"] = pt
+                normalized.append(row)
 
             timestamp = float(payload.get("timestamp") or 0)
             if timestamp <= 0 and lpr_plate_items.get(cam_id):

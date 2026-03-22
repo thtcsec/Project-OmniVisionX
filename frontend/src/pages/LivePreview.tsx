@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { chatWithCamera, fetchAgoraStatus, fetchCameras, fetchCamera, fetchIntegrationsStatus, fetchLatestDetectionsSnapshot, speakText } from "@/services/api";
+import {
+  chatWithCamera,
+  fetchAgoraStatus,
+  fetchCameras,
+  fetchCamera,
+  fetchIntegrationsStatus,
+  fetchLatestDetectionsSnapshot,
+  speakText,
+  type LatestDetectionsSnapshot,
+} from "@/services/api";
 import {
   joinCameraGroup,
   leaveCameraGroup,
@@ -27,7 +36,21 @@ import type { OmniEvent } from "@/types/omni";
 import { buildCameraHlsUrl, buildCameraWebRtcUrl } from "@/lib/mediaUrls";
 import { OVERLAY_TRACK_TTL_MS } from "@/lib/overlayConstants";
 const OMNI_STREAM_URL = (import.meta.env.OMNI_STREAM_URL as string | undefined)?.trim();
+const API_BASE = (import.meta.env.OMNI_API_BASE_URL as string | undefined) ?? "";
 
+function formatDetectionLinesForChat(
+  block: LatestDetectionsSnapshot["items"][string] | undefined,
+): string {
+  if (!block?.detections?.length) return "";
+  return block.detections
+    .map((d, i) => {
+      const label = d.class_name ?? d.class ?? "?";
+      const conf = typeof d.confidence === "number" ? `${(d.confidence * 100).toFixed(0)}%` : "";
+      const ocr = d.plate_text?.trim() ? ` · OCR: ${d.plate_text.trim()}` : "";
+      return `${i + 1}. ${label} ${conf}${ocr}`;
+    })
+    .join("\n");
+}
 
 const CAMERA_NONE = "__none__";
 const PAGE_SIZE = 10;
@@ -41,6 +64,16 @@ export default function LivePreview() {
   const [signalRStatus, setSignalRStatus] = useState<"connected" | "disconnected" | "reconnecting">("disconnected");
   const [chatText, setChatText] = useState("");
   const [chatLog, setChatLog] = useState<Array<{ role: "user" | "assistant"; content: string; meta?: string }>>([]);
+  /** Bust cache on `/api/live/snapshot` after each assistant reply so the thumb matches the analyzed frame. */
+  const [chatFrameKey, setChatFrameKey] = useState(0);
+  /** Default ON: auto-play ElevenLabs TTS after each assistant reply (persisted). */
+  const [autoSpeak, setAutoSpeak] = useState(() => {
+    try {
+      return localStorage.getItem("omni-live-autospeak") !== "false";
+    } catch {
+      return true;
+    }
+  });
 
   const { data: cameras } = useQuery({ queryKey: ["cameras"], queryFn: fetchCameras });
 
@@ -73,6 +106,28 @@ export default function LivePreview() {
     [camera],
   );
 
+  const integrationsQuery = useQuery({
+    queryKey: ["integrations-status"],
+    queryFn: fetchIntegrationsStatus,
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const agoraStatusQuery = useQuery({
+    queryKey: ["agora-status"],
+    queryFn: fetchAgoraStatus,
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const llmConfigured = !!(
+    integrationsQuery.data?.dify?.configured ||
+    integrationsQuery.data?.openai?.configured ||
+    integrationsQuery.data?.qwen?.configured
+  );
+  const ttsConfigured = !!integrationsQuery.data?.elevenlabs?.configured;
+  const agoraConfigured = !!agoraStatusQuery.data?.configured;
+
   const mergeEvent = useCallback(
     (event: OmniEvent) => {
       const evCam = String(event.cameraId ?? "").trim();
@@ -91,12 +146,16 @@ export default function LivePreview() {
     [cameraId],
   );
 
-  /** Direct omni-object snapshot — works even when Redis→API→SignalR path is down. */
+  /** Direct omni-object snapshot — overlays + chat OCR lines (poll when tracks on or LLM chat). */
   const snapshotQuery = useQuery({
     queryKey: ["latestDetectionsSnapshot", cameraId],
     queryFn: () => fetchLatestDetectionsSnapshot(cameraId),
-    enabled: !!cameraId && cameraId !== CAMERA_NONE && showTracks && !mjpegUrl,
-    refetchInterval: 500,
+    enabled:
+      !!cameraId &&
+      cameraId !== CAMERA_NONE &&
+      !mjpegUrl &&
+      (showTracks || llmConfigured),
+    refetchInterval: showTracks ? 500 : 2000,
     retry: 1,
   });
 
@@ -107,6 +166,8 @@ export default function LivePreview() {
     if (!dets?.length) return;
     const ts = Date.now();
     const blockSourceTs = typeof block?.timestamp === "number" ? block.timestamp * 1000 : ts;
+    const fw = typeof block?.frame_width === "number" && block.frame_width > 0 ? block.frame_width : undefined;
+    const fh = typeof block?.frame_height === "number" && block.frame_height > 0 ? block.frame_height : undefined;
     setTracks((prev) => {
       const next = new Map(prev);
       for (const d of dets) {
@@ -126,38 +187,41 @@ export default function LivePreview() {
           lastSeen: ts,
           kind: "detection",
           sourceTs: blockSourceTs,
+          ...(fw != null && fh != null ? { sourceFrameW: fw, sourceFrameH: fh } : {}),
         } as TrackOverlay);
       }
       return next;
     });
   }, [snapshotQuery.data, cameraId, showTracks]);
 
-  const integrationsQuery = useQuery({
-    queryKey: ["integrations-status"],
-    queryFn: fetchIntegrationsStatus,
-    staleTime: 60_000,
-    retry: false,
-  });
+  /** Agora is viewer-only: needs a publisher on the same channel. Prefer HLS/WebRTC (MediaMTX) when URLs exist. */
+  const useAgoraFallback =
+    agoraConfigured && cameraId !== CAMERA_NONE && !mjpegUrl && !hlsUrl && !webrtcUrl;
 
-  const agoraStatusQuery = useQuery({
-    queryKey: ["agora-status"],
-    queryFn: fetchAgoraStatus,
-    staleTime: 60_000,
-    retry: false,
-  });
-
-  const llmConfigured = !!(
-    integrationsQuery.data?.dify.configured ||
-    integrationsQuery.data?.openai.configured ||
-    integrationsQuery.data?.qwen.configured
-  );
-  const ttsConfigured = !!integrationsQuery.data?.elevenlabs.configured;
-  const agoraConfigured = !!agoraStatusQuery.data?.configured;
+  const autoSpeakRef = useRef(autoSpeak);
+  autoSpeakRef.current = autoSpeak;
+  const ttsConfiguredRef = useRef(ttsConfigured);
+  ttsConfiguredRef.current = ttsConfigured;
 
   const chatMut = useMutation({
     mutationFn: (payload: { message: string; cameraId?: string }) => chatWithCamera(payload),
-    onSuccess: (data) => {
-      setChatLog((prev) => [...prev, { role: "assistant", content: data.reply, meta: `${data.provider}:${data.model}` }]);
+    onSuccess: async (data) => {
+      setChatFrameKey((k) => k + 1);
+      const bits = [`${data.provider}:${data.model}`];
+      if (data.visionUsed) bits.push("vision");
+      if (data.exaUsed) bits.push("exa");
+      setChatLog((prev) => [...prev, { role: "assistant", content: data.reply, meta: bits.join(" · ") }]);
+      if (ttsConfiguredRef.current && autoSpeakRef.current && data.reply?.trim()) {
+        try {
+          const blob = await speakText({ text: data.reply });
+          const url = URL.createObjectURL(blob);
+          const audio = new Audio(url);
+          audio.onended = () => URL.revokeObjectURL(url);
+          await audio.play();
+        } catch {
+          /* TTS failed — user can still use Speak */
+        }
+      }
     },
     onError: (err) => {
       setChatLog((prev) => [...prev, { role: "assistant", content: err instanceof Error ? err.message : "Chat failed", meta: "error" }]);
@@ -185,6 +249,7 @@ export default function LivePreview() {
     setTracks(new Map());
     if (!cameraId || cameraId === CAMERA_NONE) {
       setChatLog([]);
+      setChatFrameKey(0);
       return;
     }
     // Periodic stale-track eviction
@@ -204,6 +269,16 @@ export default function LivePreview() {
   const trackList = useMemo(() => [...tracks.values()].sort((a, b) => b.lastSeen - a.lastSeen), [tracks]);
   const freshCount = trackList.filter((x) => Date.now() - x.lastSeen < OVERLAY_TRACK_TTL_MS).length;
   const canChat = llmConfigured && cameraId !== CAMERA_NONE && !chatMut.isPending;
+
+  const chatSnapshotSrc =
+    cameraId !== CAMERA_NONE
+      ? `${API_BASE.replace(/\/$/, "")}/api/live/snapshot/${encodeURIComponent(cameraId)}?t=${chatFrameKey}`
+      : undefined;
+
+  const detectionLines = useMemo(() => {
+    if (cameraId === CAMERA_NONE) return "";
+    return formatDetectionLinesForChat(snapshotQuery.data?.items?.[cameraId]);
+  }, [cameraId, snapshotQuery.data]);
   const ttsMut = useMutation({
     mutationFn: (payload: { text: string }) => speakText(payload),
   });
@@ -361,7 +436,7 @@ export default function LivePreview() {
                 <div className="relative overflow-hidden rounded-lg bg-black">
                   <img src={mjpegUrl} alt="omni-stream" className="aspect-video h-full w-full object-contain" />
                 </div>
-              ) : agoraConfigured && cameraId !== CAMERA_NONE ? (
+              ) : useAgoraFallback ? (
                 <AgoraPlayer channelName={cameraId} />
               ) : (
                 <LiveStreamPlayer
@@ -387,7 +462,7 @@ export default function LivePreview() {
                       ? t("live.signalRReconnecting")
                       : t("live.signalRDisconnected")}
                 </Badge>
-                {agoraConfigured && (
+                {useAgoraFallback && (
                   <Badge variant="outline" className="border-sky-500/50 text-sky-700 dark:text-sky-300">
                     Agora RTC
                   </Badge>
@@ -421,6 +496,46 @@ export default function LivePreview() {
         <CardContent className="space-y-3">
           {!llmConfigured && (
             <p className="text-sm text-muted-foreground">{t("live.chatNeedConfig")}</p>
+          )}
+          {ttsConfigured && (
+            <div className="flex flex-col gap-1 rounded-md border px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="omni-autospeak" className="text-sm">
+                  {t("live.chatAutoSpeak")}
+                </Label>
+                <p className="text-xs text-muted-foreground">{t("live.chatAutoSpeakHint")}</p>
+              </div>
+              <Switch
+                id="omni-autospeak"
+                checked={autoSpeak}
+                onCheckedChange={(v) => {
+                  setAutoSpeak(v);
+                  try {
+                    localStorage.setItem("omni-live-autospeak", v ? "true" : "false");
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              />
+            </div>
+          )}
+          {cameraId !== CAMERA_NONE && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1 min-w-0">
+                <p className="text-xs text-muted-foreground">{t("live.chatVisionFrame")}</p>
+                <img
+                  src={chatSnapshotSrc}
+                  alt=""
+                  className="w-full max-h-40 rounded-md border object-contain bg-muted"
+                />
+              </div>
+              <div className="space-y-1 min-w-0">
+                <p className="text-xs text-muted-foreground">{t("live.chatDetectionLines")}</p>
+                <pre className="text-[10px] leading-snug max-h-40 overflow-auto rounded-md border bg-muted/50 p-2 font-mono whitespace-pre-wrap">
+                  {detectionLines || t("live.chatNoDetectionText")}
+                </pre>
+              </div>
+            </div>
           )}
           <ScrollArea className="h-[220px] rounded-md border p-3">
             <div className="space-y-2">

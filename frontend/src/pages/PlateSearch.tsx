@@ -15,10 +15,14 @@ export default function PlateSearch() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<PlateResult | null>(null);
 
-  const { data: plates, isLoading, isError } = useQuery({
+  const { data: plates, isLoading, isError, dataUpdatedAt, isFetching } = useQuery({
     queryKey: ["plates", search],
     queryFn: () => fetchPlates(search || undefined),
     enabled: true,
+    /** DB-backed list — not SignalR; poll so new LPR rows from omni-vehicle appear without manual refresh. */
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
+    staleTime: 0,
   });
 
   const handleSearch = () => setSearch(query);
@@ -41,6 +45,11 @@ export default function PlateSearch() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Plate Search</h1>
         <p className="text-muted-foreground text-sm mt-1">Search license plate detections</p>
+        <p className="text-muted-foreground text-xs mt-2 max-w-xl">
+          Data comes from Postgres (rows inserted by omni-vehicle LPR). This page polls the API about every 10s — it is
+          not SignalR. No new rows usually means the LPR worker is down, wrong DB connection, or duplicate suppression
+          (same plate + camera within the dedup window).
+        </p>
       </div>
 
       <div className="flex gap-3">
@@ -59,6 +68,11 @@ export default function PlateSearch() {
           <Button variant="outline" onClick={exportCSV}>
             <Download className="h-4 w-4 mr-1" />CSV
           </Button>
+        )}
+        {dataUpdatedAt > 0 && (
+          <span className="text-[11px] text-muted-foreground self-center tabular-nums">
+            {isFetching ? "Updating…" : `Last fetch ${new Date(dataUpdatedAt).toLocaleTimeString()}`}
+          </span>
         )}
       </div>
 

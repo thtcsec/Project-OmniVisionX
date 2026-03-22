@@ -186,6 +186,8 @@ public class OmniEventConsumerService : BackgroundService
                 bbox = fields.GetValueOrDefault("bbox"),
                 confidence = fields.GetValueOrDefault("confidence"),
                 timestamp = fields.GetValueOrDefault("timestamp"),
+                frameWidth = fields.GetValueOrDefault("frame_width"),
+                frameHeight = fields.GetValueOrDefault("frame_height"),
             },
         };
 

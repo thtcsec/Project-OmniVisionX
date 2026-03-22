@@ -75,7 +75,8 @@ export const en = {
     nextPage: "Next page",
     pageIndicator: "Page {page} of {total}",
     chatTitle: "Chat with Camera",
-    chatHint: "Quick questions about the current scene (OpenAI/Qwen).",
+    chatHint:
+      "Ask about the scene. OpenAI / Qwen-VL can analyze the same JPEG as the thumbnail plus the detection lines (incl. OCR). Dify is text-only; thumbnail still shows here.",
     chatNeedConfig:
       "No LLM configured. Go to Settings → Integrations and set Dify, OpenAI, or Qwen keys.",
     chatEmpty: "No messages yet.",
@@ -84,6 +85,11 @@ export const en = {
     chatPlaceholder: "Type a question…",
     chatSend: "Send",
     chatSpeak: "Speak",
+    chatVisionFrame: "Frame for the assistant (API → omni-object snapshot)",
+    chatDetectionLines: "Detection + OCR (from latest snapshot)",
+    chatNoDetectionText: "No structured lines yet — enable overlays or wait for omni-object / LPR.",
+    chatAutoSpeak: "Auto-speak replies",
+    chatAutoSpeakHint: "Play ElevenLabs audio when the assistant answers (default on). You can still use Speak on each message.",
   },
   about: {
     tagline:

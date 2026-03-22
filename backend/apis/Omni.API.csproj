@@ -6,7 +6,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <!-- SDK globs **/*.cs under backend/apis/ — exclude vendored Agora Tools (only link via ProjectReference). -->
   <ItemGroup>
+    <Compile Remove="vendor\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="vendor\AgoraIO-Tools\DynamicKey\AgoraDynamicKey\csharp\src\AgoraIO\AgoraIO.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.1.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.0" />

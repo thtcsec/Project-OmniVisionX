@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -58,15 +59,22 @@ public sealed class CameraChatController : ControllerBase
         systemPrompt.Append("Answer briefly and concretely. ");
         systemPrompt.Append("If you reference detections, use the provided snapshot and state uncertainty when missing.");
 
+        byte[]? frameJpeg = null;
+        var wantVision = request.IncludeFrameImage != false;
+        if (!string.IsNullOrWhiteSpace(request.CameraId) && wantVision)
+            frameJpeg = await TryFetchSnapshotJpegAsync(request.CameraId.Trim(), ct);
+
         if (!string.IsNullOrWhiteSpace(request.CameraId))
         {
-            var snapshot = await TryFetchLatestDetectionsAsync(request.CameraId.Trim(), ct);
-            if (snapshot is not null)
+            var detectionText = await TryFetchDetectionContextAsync(request.CameraId.Trim(), ct);
+            if (detectionText is not null)
             {
-                systemPrompt.Append("\n\nLatest detections snapshot (may be empty):\n");
-                systemPrompt.Append(snapshot);
+                systemPrompt.Append("\n\nStructured detection + OCR context (from pipeline; may be empty):\n");
+                systemPrompt.Append(detectionText);
             }
         }
+
+        var visionUsed = false;
 
         var exaKey = _env.Get("OMNI_EXA_API_KEY");
         var useExa = request.UseExaGrounding != false
@@ -86,11 +94,13 @@ public sealed class CameraChatController : ControllerBase
 
         if (provider == "dify")
         {
+            if (frameJpeg is { Length: > 0 })
+                systemPrompt.Append("\n\nNote: A live camera JPEG is shown to the user in the UI (not attached here). Use detection context above plus general knowledge.");
             var difyQuery = systemPrompt + "\n\nUser question: " + message;
             var reply = await CallDifyChatAsync(difyBase, difyKey!, difyQuery, ct);
             if (reply.Error != null)
                 return StatusCode(reply.StatusCode ?? 502, new { error = reply.Error });
-            return Ok(new ChatResponse("dify", "dify-chat", reply.Text ?? "", exaUsed));
+            return Ok(new ChatResponse("dify", "dify-chat", reply.Text ?? "", exaUsed, false));
         }
 
         var endpoint = provider == "openai"
@@ -101,8 +111,31 @@ public sealed class CameraChatController : ControllerBase
         var apiKey = provider == "openai" ? openAiKey! : qwenKey!;
 
         using var client = _httpFactory.CreateClient();
-        client.Timeout = TimeSpan.FromSeconds(60);
+        client.Timeout = TimeSpan.FromSeconds(90);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+        object userMessage;
+        if (frameJpeg is { Length: > 0 } && ShouldSendVision(provider, model))
+        {
+            var b64 = Convert.ToBase64String(frameJpeg);
+            var dataUrl = "data:image/jpeg;base64," + b64;
+            userMessage = new
+            {
+                role = "user",
+                content = new object[]
+                {
+                    new { type = "text", text = message },
+                    new { type = "image_url", image_url = new { url = dataUrl, detail = "low" } },
+                },
+            };
+            visionUsed = true;
+        }
+        else
+        {
+            if (frameJpeg is { Length: > 0 })
+                systemPrompt.Append("\n\nNote: A camera snapshot exists but this model is text-only; rely on structured detection lines above.");
+            userMessage = new { role = "user", content = message };
+        }
 
         var body = new
         {
@@ -111,7 +144,7 @@ public sealed class CameraChatController : ControllerBase
             messages = new object[]
             {
                 new { role = "system", content = systemPrompt.ToString() },
-                new { role = "user", content = message },
+                userMessage,
             },
         };
 
@@ -122,7 +155,143 @@ public sealed class CameraChatController : ControllerBase
             return StatusCode((int)resp.StatusCode, new { error = text.Length > 500 ? text[..500] : text });
 
         var replyText = ExtractChatReply(text) ?? "";
-        return Ok(new ChatResponse(provider, model, replyText, exaUsed));
+        return Ok(new ChatResponse(provider, model, replyText, exaUsed, visionUsed));
+    }
+
+    private static bool ShouldSendVision(string provider, string model)
+    {
+        var m = model.ToLowerInvariant();
+        if (provider == "openai")
+        {
+            if (m.Contains("gpt-3.5", StringComparison.OrdinalIgnoreCase))
+                return false;
+            // o1/o3 families are often text-only or different modalities — avoid vision unless using a known vision SKU.
+            if (m.StartsWith("o1", StringComparison.OrdinalIgnoreCase) || m.StartsWith("o3", StringComparison.OrdinalIgnoreCase))
+                return false;
+            return m.Contains("gpt-4", StringComparison.OrdinalIgnoreCase)
+                || m.Contains("gpt-5", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (provider == "qwen")
+            return m.Contains("vl", StringComparison.OrdinalIgnoreCase) || m.Contains("vision", StringComparison.OrdinalIgnoreCase);
+
+        return false;
+    }
+
+    private async Task<byte[]?> TryFetchSnapshotJpegAsync(string cameraId, CancellationToken ct)
+    {
+        var baseUrl = (_configuration["OmniObject:BaseUrl"] ?? _configuration["OmniObject__BaseUrl"] ?? "http://omni-object:8555").TrimEnd('/');
+        var url = $"{baseUrl}/rtsp/snap/{Uri.EscapeDataString(cameraId)}";
+        try
+        {
+            using var client = _httpFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(12);
+            using var resp = await client.GetAsync(url, ct);
+            if (!resp.IsSuccessStatusCode)
+                return null;
+            return await resp.Content.ReadAsByteArrayAsync(ct);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task<string?> TryFetchDetectionContextAsync(string cameraId, CancellationToken ct)
+    {
+        var baseUrl = (_configuration["OmniObject:BaseUrl"] ?? _configuration["OmniObject__BaseUrl"] ?? "http://omni-object:8555").TrimEnd('/');
+        var url = $"{baseUrl}/rtsp/detections/latest?cameraIds={Uri.EscapeDataString(cameraId)}";
+        try
+        {
+            using var client = _httpFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(8);
+            using var resp = await client.GetAsync(url, ct);
+            if (!resp.IsSuccessStatusCode)
+                return null;
+            var json = await resp.Content.ReadAsStringAsync(ct);
+            return FormatDetectionContext(json, cameraId);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? FormatDetectionContext(string json, string cameraId)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Object)
+                return json.Length > 6000 ? json[..6000] + "…" : json;
+
+            if (!items.TryGetProperty(cameraId, out var cam))
+                return "No detection block for this camera yet (items may be empty).";
+
+            var sb = new StringBuilder();
+            if (cam.TryGetProperty("frame_width", out var fw) && cam.TryGetProperty("frame_height", out var fh)
+                && fw.TryGetInt32(out var w) && fh.TryGetInt32(out var h))
+                sb.AppendLine($"Frame size (inference space): {w}x{h} px");
+
+            if (cam.TryGetProperty("timestamp", out var ts) && ts.TryGetDouble(out var tUnix))
+                sb.AppendLine($"Snapshot unix time: {tUnix.ToString(CultureInfo.InvariantCulture)}");
+
+            if (!cam.TryGetProperty("detections", out var dets) || dets.ValueKind != JsonValueKind.Array)
+            {
+                sb.AppendLine("No detections array.");
+                return sb.ToString();
+            }
+
+            var n = 0;
+            foreach (var d in dets.EnumerateArray())
+            {
+                n++;
+                var cls = d.TryGetProperty("class_name", out var cn) && cn.ValueKind == JsonValueKind.String
+                    ? cn.GetString() ?? "?"
+                    : "?";
+                var conf = 0.0;
+                if (d.TryGetProperty("confidence", out var cf) && cf.TryGetDouble(out var cfd))
+                    conf = cfd;
+                var bboxStr = "";
+                if (d.TryGetProperty("bbox", out var bb) && bb.ValueKind == JsonValueKind.Array)
+                {
+                    var parts = new List<string>();
+                    foreach (var x in bb.EnumerateArray())
+                    {
+                        if (x.TryGetDouble(out var dv))
+                            parts.Add(dv.ToString("0.##", CultureInfo.InvariantCulture));
+                    }
+                    bboxStr = string.Join(",", parts);
+                }
+
+                sb.AppendLine($"{n}. {cls} conf={conf:F2} bbox=[{bboxStr}] source={GetStr(d, "source")}");
+                if (d.TryGetProperty("plate_text", out var pt) && pt.ValueKind == JsonValueKind.String)
+                {
+                    var p = pt.GetString();
+                    if (!string.IsNullOrWhiteSpace(p))
+                        sb.AppendLine($"   OCR / plate_text: {p}");
+                }
+            }
+
+            if (n == 0)
+                sb.AppendLine("(detections array empty)");
+
+            var s = sb.ToString();
+            return s.Length > 12000 ? s[..12000] + "…" : s;
+        }
+        catch
+        {
+            return json.Length > 6000 ? json[..6000] + "…" : json;
+        }
+    }
+
+    private static string GetStr(JsonElement d, string name)
+    {
+        if (!d.TryGetProperty(name, out var el) || el.ValueKind != JsonValueKind.String)
+            return "";
+        return el.GetString() ?? "";
     }
 
     private async Task<string?> TryExaGroundingAsync(string apiKey, string userMessage, CancellationToken ct)
@@ -237,25 +406,6 @@ public sealed class CameraChatController : ControllerBase
         }
     }
 
-    private async Task<string?> TryFetchLatestDetectionsAsync(string cameraId, CancellationToken ct)
-    {
-        var baseUrl = (_configuration["OmniObject:BaseUrl"] ?? _configuration["OmniObject__BaseUrl"] ?? "http://omni-object:8555").TrimEnd('/');
-        var url = $"{baseUrl}/rtsp/detections/latest?cameraIds={Uri.EscapeDataString(cameraId)}";
-        try
-        {
-            using var client = _httpFactory.CreateClient();
-            client.Timeout = TimeSpan.FromSeconds(6);
-            using var resp = await client.GetAsync(url, ct);
-            if (!resp.IsSuccessStatusCode) return null;
-            var json = await resp.Content.ReadAsStringAsync(ct);
-            return json.Length > 800 ? json[..800] : json;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
     private static string? ExtractChatReply(string rawJson)
     {
         try
@@ -289,7 +439,11 @@ public sealed class CameraChatController : ControllerBase
         /// <summary>When false, skip Exa web search even if OMNI_EXA_API_KEY is set.</summary>
         [JsonPropertyName("useExaGrounding")]
         public bool? UseExaGrounding { get; set; }
+
+        /// <summary>When false, skip fetching JPEG from omni-object (text-only chat).</summary>
+        [JsonPropertyName("includeFrameImage")]
+        public bool? IncludeFrameImage { get; set; }
     }
 
-    public sealed record ChatResponse(string Provider, string Model, string Reply, bool ExaUsed = false);
+    public sealed record ChatResponse(string Provider, string Model, string Reply, bool ExaUsed = false, bool VisionUsed = false);
 }

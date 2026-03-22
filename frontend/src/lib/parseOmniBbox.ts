@@ -10,6 +10,9 @@ export type TrackOverlay = {
   confidence: number;
   lastSeen: number;
   kind: OmniEvent["type"];
+  /** Inference frame size (bbox pixel space). When set, overlay must use these instead of video.videoWidth/Height. */
+  sourceFrameW?: number;
+  sourceFrameH?: number;
 };
 
 /** Parse hub `data` whether it arrives as JSON string or pre-parsed object. */
@@ -59,7 +62,23 @@ export function parseBboxFromOmniEvent(event: OmniEvent): Omit<TrackOverlay, "la
       (typeof d.faceIdentity === "string" && d.faceIdentity) ||
       event.type;
     const confidence = parseFloat(String(d.confidence ?? "0")) || 0;
-    return { id, x1, y1, x2, y2, label, confidence, kind: event.type };
+    const fwRaw = d.frameWidth ?? d.FrameWidth ?? d.frame_width;
+    const fhRaw = d.frameHeight ?? d.FrameHeight ?? d.frame_height;
+    const sourceFrameW = typeof fwRaw === "number" ? fwRaw : parseFloat(String(fwRaw ?? ""));
+    const sourceFrameH = typeof fhRaw === "number" ? fhRaw : parseFloat(String(fhRaw ?? ""));
+    const overlay: Omit<TrackOverlay, "lastSeen"> = {
+      id,
+      x1,
+      y1,
+      x2,
+      y2,
+      label,
+      confidence,
+      kind: event.type,
+    };
+    if (Number.isFinite(sourceFrameW) && sourceFrameW > 0) overlay.sourceFrameW = sourceFrameW;
+    if (Number.isFinite(sourceFrameH) && sourceFrameH > 0) overlay.sourceFrameH = sourceFrameH;
+    return overlay;
   } catch {
     return null;
   }

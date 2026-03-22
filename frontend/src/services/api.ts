@@ -159,6 +159,7 @@ export type LatestDetectionsSnapshot = {
         class?: string;
         confidence?: number;
         bbox: [number, number, number, number];
+        plate_text?: string;
       }>;
     }
   >;
@@ -240,14 +241,40 @@ export type IntegrationsStatus = {
   dify: { configured: boolean };
 };
 
-export const fetchIntegrationsStatus = () => request<IntegrationsStatus>(`${API_BASE}/api/integrations/status`);
+function readConfigured(raw: unknown, key: string): boolean {
+  if (!raw || typeof raw !== "object") return false;
+  const block = (raw as Record<string, unknown>)[key];
+  if (!block || typeof block !== "object") return false;
+  return Boolean((block as { configured?: unknown }).configured);
+}
+
+/** Ensures every integration key exists — avoids crashes if API or cached bundles omit fields. */
+export function normalizeIntegrationsStatus(raw: unknown): IntegrationsStatus {
+  const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return {
+    agora: { configured: readConfigured(o, "agora") },
+    elevenlabs: { configured: readConfigured(o, "elevenlabs") },
+    valsea: { configured: readConfigured(o, "valsea") },
+    openai: { configured: readConfigured(o, "openai") },
+    exa: { configured: readConfigured(o, "exa") },
+    qwen: { configured: readConfigured(o, "qwen") },
+    dify: { configured: readConfigured(o, "dify") },
+  };
+}
+
+export async function fetchIntegrationsStatus(): Promise<IntegrationsStatus> {
+  const raw = await request<unknown>(`${API_BASE}/api/integrations/status`);
+  return normalizeIntegrationsStatus(raw);
+}
 
 export const chatWithCamera = (payload: {
   message: string;
   cameraId?: string;
   useExaGrounding?: boolean;
+  /** When false, backend skips omni-object JPEG (text-only). Default: vision when model supports it. */
+  includeFrameImage?: boolean;
 }) =>
-  request<{ provider: string; model: string; reply: string; exaUsed?: boolean }>(
+  request<{ provider: string; model: string; reply: string; exaUsed?: boolean; visionUsed?: boolean }>(
     `${API_BASE}/api/integrations/chat`,
     {
       method: "POST",
@@ -255,6 +282,7 @@ export const chatWithCamera = (payload: {
         message: payload.message,
         cameraId: payload.cameraId,
         useExaGrounding: payload.useExaGrounding,
+        includeFrameImage: payload.includeFrameImage,
       }),
     },
   );
