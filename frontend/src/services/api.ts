@@ -177,6 +177,8 @@ export type LiveIngestStatus = {
   healthOk?: boolean;
   ingestCameraIds?: string[];
   detail?: string;
+  /** Same rule as omni-object: Status=online + non-empty StreamUrl */
+  dbOnlineCameraCount?: number | null;
 };
 
 /** omni-object capture pool — explains missing bbox when empty or camera id not listed */

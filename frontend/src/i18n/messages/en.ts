@@ -65,9 +65,15 @@ export const en = {
     ingestCameraMissingTitle: "This camera ID is not in the detector capture pool",
     ingestCameraMissingBody:
       "The API sees omni-object, but this camera is not ingesting yet. Confirm RTSP works from the container network, Status = Online, and wait ~30s for the DB sync loop.",
-    ingestPoolEmptyTitle: "Detector capture pool is empty",
-    ingestPoolEmptyBody:
-      "omni-object is up but has no active RTSP readers. Check cameras are Online in the DB, stream URLs are valid, and watch omni-object logs for FFmpeg/OpenCV errors.",
+    ingestDbNoOnlineTitle: "No online cameras in the database",
+    ingestDbNoOnlineBody:
+      "Postgres has no camera with Status = online and a non-empty stream URL — same rule omni-object uses. Open Cameras, set Online, save, then wait ~30s (detector poll interval).",
+    ingestDbMismatchTitle: "Database shows online cameras, but the detector pool is empty",
+    ingestDbMismatchBody:
+      "The API counts {n} online camera(s) in Postgres, but omni-object still has zero RTSP readers. Often DATABASE_URL inside omni-object does not point at the same DB as the API, or the detector logs a sync error. Check: docker logs omni-object — and in Compose use postgresql+asyncpg://postgres:admin@omni-db:5432/omnivision",
+    ingestPoolUnknownTitle: "Detector pool empty (could not read DB count)",
+    ingestPoolUnknownBody:
+      "If the API cannot query Postgres here, compare manually. Otherwise see omni-object logs for FFmpeg/OpenCV and DB sync.",
     snapshotOk: "HTTP snapshot",
     snapshotError: "HTTP snapshot failed",
     overlayOffHint: "Tracking overlays are OFF — turn the switch on to draw boxes.",

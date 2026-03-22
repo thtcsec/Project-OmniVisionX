@@ -67,9 +67,15 @@ export const vi: MessageTree = {
     ingestCameraMissingTitle: "Camera này chưa có trong capture pool của detector",
     ingestCameraMissingBody:
       "API thấy omni-object nhưng camera chưa được ingest. Kiểm tra RTSP từ mạng container, Status = Online, đợi ~30s cho vòng sync DB.",
-    ingestPoolEmptyTitle: "Capture pool của detector đang trống",
-    ingestPoolEmptyBody:
-      "omni-object chạy nhưng chưa có RTSP nào. Kiểm tra camera Online trong DB, URL stream, log omni-object (FFmpeg/OpenCV).",
+    ingestDbNoOnlineTitle: "Không có camera online trong database",
+    ingestDbNoOnlineBody:
+      "Postgres không có dòng nào Status = online và StreamUrl khác rỗng (cùng điều kiện omni-object dùng). Vào Cameras, chuyển Online, lưu, đợi ~30s (chu kỳ poll detector).",
+    ingestDbMismatchTitle: "DB có camera online nhưng capture pool detector vẫn trống",
+    ingestDbMismatchBody:
+      "API đếm {n} camera online trong Postgres nhưng omni-object báo 0 RTSP reader. Thường do DATABASE_URL trong omni-object không trùng DB với API, hoặc lỗi sync (xem docker logs omni-object). Trong Compose dùng postgresql+asyncpg://postgres:admin@omni-db:5432/omnivision",
+    ingestPoolUnknownTitle: "Pool detector trống (chưa đọc được số camera từ DB)",
+    ingestPoolUnknownBody:
+      "Nếu API không truy vấn được Postgres, tự kiểm tra DB; không thì xem log omni-object (FFmpeg/OpenCV, sync DB).",
     snapshotOk: "HTTP snapshot",
     snapshotError: "HTTP snapshot lỗi",
     overlayOffHint: "Đang TẮT khung tracking — bật công tắc để vẽ khung.",

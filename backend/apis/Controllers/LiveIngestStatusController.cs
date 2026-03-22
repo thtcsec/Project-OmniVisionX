@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Omni.API.Persistence;
 
 namespace Omni.API.Controllers;
 
@@ -13,15 +15,18 @@ public sealed class LiveIngestStatusController : ControllerBase
 {
     private readonly IHttpClientFactory _httpFactory;
     private readonly IConfiguration _configuration;
+    private readonly OmniDbContext _db;
     private readonly ILogger<LiveIngestStatusController> _logger;
 
     public LiveIngestStatusController(
         IHttpClientFactory httpFactory,
         IConfiguration configuration,
+        OmniDbContext db,
         ILogger<LiveIngestStatusController> logger)
     {
         _httpFactory = httpFactory;
         _configuration = configuration;
+        _db = db;
         _logger = logger;
     }
 
@@ -29,6 +34,20 @@ public sealed class LiveIngestStatusController : ControllerBase
     public async Task<IActionResult> Get(CancellationToken cancellationToken)
     {
         var baseUrl = (_configuration["OmniObject:BaseUrl"] ?? "http://localhost:8555").TrimEnd('/');
+
+        int? dbOnlineCameraCount = null;
+        try
+        {
+            dbOnlineCameraCount = await _db.Cameras.AsNoTracking().CountAsync(
+                c => c.Status.ToLower() == "online"
+                     && c.StreamUrl != null
+                     && c.StreamUrl.Trim() != "",
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "ingest-status: could not count online cameras in DB");
+        }
 
         try
         {
@@ -75,6 +94,7 @@ public sealed class LiveIngestStatusController : ControllerBase
                 healthStatus = (int)healthRes.StatusCode,
                 camerasStatus = (int)camsRes.StatusCode,
                 ingestCameraIds = ingestIds,
+                dbOnlineCameraCount,
             });
         }
         catch (Exception ex)
@@ -85,6 +105,7 @@ public sealed class LiveIngestStatusController : ControllerBase
                 reachable = false,
                 ingestCameraIds = Array.Empty<string>(),
                 detail = ex.Message,
+                dbOnlineCameraCount,
             });
         }
     }

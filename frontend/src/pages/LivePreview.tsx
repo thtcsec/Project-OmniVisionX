@@ -452,11 +452,34 @@ export default function LivePreview() {
                 </Alert>
               )}
               {ingestStatusQuery.data?.reachable &&
-                camera?.status === "online" &&
-                (ingestStatusQuery.data.ingestCameraIds?.length ?? 0) === 0 && (
+                (ingestStatusQuery.data.ingestCameraIds?.length ?? 0) === 0 &&
+                typeof ingestStatusQuery.data.dbOnlineCameraCount === "number" &&
+                ingestStatusQuery.data.dbOnlineCameraCount === 0 && (
                   <Alert className="border-amber-500/60 py-3">
-                    <AlertTitle className="text-sm">{t("live.ingestPoolEmptyTitle")}</AlertTitle>
-                    <AlertDescription className="text-xs">{t("live.ingestPoolEmptyBody")}</AlertDescription>
+                    <AlertTitle className="text-sm">{t("live.ingestDbNoOnlineTitle")}</AlertTitle>
+                    <AlertDescription className="text-xs">{t("live.ingestDbNoOnlineBody")}</AlertDescription>
+                  </Alert>
+                )}
+              {ingestStatusQuery.data?.reachable &&
+                (ingestStatusQuery.data.ingestCameraIds?.length ?? 0) === 0 &&
+                typeof ingestStatusQuery.data.dbOnlineCameraCount === "number" &&
+                ingestStatusQuery.data.dbOnlineCameraCount > 0 && (
+                  <Alert className="border-amber-500/60 py-3">
+                    <AlertTitle className="text-sm">{t("live.ingestDbMismatchTitle")}</AlertTitle>
+                    <AlertDescription className="text-xs">
+                      {t("live.ingestDbMismatchBody").replace(
+                        "{n}",
+                        String(ingestStatusQuery.data.dbOnlineCameraCount),
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              {ingestStatusQuery.data?.reachable &&
+                (ingestStatusQuery.data.ingestCameraIds?.length ?? 0) === 0 &&
+                ingestStatusQuery.data.dbOnlineCameraCount == null && (
+                  <Alert className="border-amber-500/60 py-3">
+                    <AlertTitle className="text-sm">{t("live.ingestPoolUnknownTitle")}</AlertTitle>
+                    <AlertDescription className="text-xs">{t("live.ingestPoolUnknownBody")}</AlertDescription>
                   </Alert>
                 )}
               {ingestStatusQuery.data?.reachable &&
